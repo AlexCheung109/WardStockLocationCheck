@@ -57,11 +57,15 @@
             color: red;
             margin: 10px 0;
         }
+        .location-text {
+            font-weight: bold;
+            font-size: 180%;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Ward Stock Location Checker</h1>
+        <h1>Ward Stock Item Bin Shelve Checker</h1>
         
         <div id="loading">Loading...</div>
         <div id="error" class="error"></div>
@@ -192,7 +196,7 @@
                     <h3>Search Result:</h3>
                     <p>Ward: ${found.ward}</p>
                     <p>Item Code: ${found.itemCode}</p>
-                    <p>Location: ${found.location}</p>
+                    <p>Location: <span class="location-text">${found.location}</span></p>
                 `;
             } else {
                 resultDiv.innerHTML = 'No matching records found';
