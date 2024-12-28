@@ -6,52 +6,17 @@
     <title>資料搜尋系統</title>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
+        /* 原有的 CSS 保持不變 */
+        .error {
+            color: red;
+            margin: 10px 0;
         }
-        .container {
-            background-color: #f5f5f5;
-            padding: 20px;
-            border-radius: 8px;
-        }
-        .search-group {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        select, input {
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        #result {
+        #debug {
             margin-top: 20px;
             padding: 10px;
+            background-color: #f8f8f8;
             border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        #loading {
             display: none;
-            text-align: center;
-            margin: 20px 0;
         }
     </style>
 </head>
@@ -60,6 +25,8 @@
         <h1>資料搜尋系統</h1>
         
         <div id="loading">載入中...</div>
+        <div id="error" class="error"></div>
+        <div id="debug"></div>
 
         <div class="search-group">
             <label for="wardSelect">選擇病房：</label>
@@ -79,6 +46,20 @@
     <script>
         let data = [];
         let wards = new Set();
+        const DEBUG = true; // 設為 true 來顯示除錯信息
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+        }
+
+        function showDebug(message) {
+            if (DEBUG) {
+                const debugDiv = document.getElementById('debug');
+                debugDiv.style.display = 'block';
+                debugDiv.innerHTML += message + '<br>';
+            }
+        }
 
         window.onload = function() {
             loadDataFromGitHub();
@@ -87,22 +68,34 @@
         async function loadDataFromGitHub() {
             const loading = document.getElementById('loading');
             loading.style.display = 'block';
-
+            
             try {
+                // 請替換為你的實際 URL
                 const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Location.xlsx';
-                
+                showDebug('Fetching URL: ' + excelUrl);
+
                 const response = await fetch(excelUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                showDebug('Fetch response received');
+
                 const arrayBuffer = await response.arrayBuffer();
-                
+                showDebug('Data size: ' + arrayBuffer.byteLength + ' bytes');
+
                 const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                showDebug('Workbook loaded. Sheets: ' + workbook.SheetNames.join(', '));
+
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
                 
-                // 修改後的數據讀取方式
+                // 將 Excel 數據轉換為陣列
                 data = XLSX.utils.sheet_to_json(worksheet, {
                     header: ['ward', 'itemCode', 'c', 'd', 'e', 'f', 'location'],
                     range: 1
                 });
+
+                showDebug('Rows loaded: ' + data.length);
 
                 // 只保留需要的欄位
                 data = data.map(row => ({
@@ -113,6 +106,7 @@
 
                 // 獲取所有不重複的病房
                 wards = new Set(data.map(row => row.ward));
+                showDebug('Unique wards: ' + Array.from(wards).join(', '));
 
                 // 更新下拉選單
                 updateWardSelect();
@@ -120,7 +114,9 @@
                 loading.style.display = 'none';
             } catch (error) {
                 console.error('Error loading data:', error);
-                loading.innerHTML = '載入數據時發生錯誤';
+                loading.style.display = 'none';
+                showError('載入數據時發生錯誤: ' + error.message);
+                showDebug('Error details: ' + error.stack);
             }
         }
 
@@ -134,6 +130,7 @@
                 option.textContent = ward;
                 select.appendChild(option);
             });
+            showDebug('Ward select updated with ' + wards.size + ' options');
         }
 
         function searchLocation() {
@@ -145,6 +142,8 @@
                 resultDiv.innerHTML = '請選擇病房並輸入物品編號';
                 return;
             }
+
+            showDebug('Searching for ward: ' + selectedWard + ', itemCode: ' + itemCode);
 
             const found = data.find(row => 
                 row.ward === selectedWard && 
@@ -158,8 +157,10 @@
                     <p>物品編號：${found.itemCode}</p>
                     <p>位置：${found.location}</p>
                 `;
+                showDebug('Result found');
             } else {
                 resultDiv.innerHTML = '找不到符合的資料';
+                showDebug('No result found');
             }
         }
     </script>
