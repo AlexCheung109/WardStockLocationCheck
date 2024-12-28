@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>資料搜尋系統</title>
+    <title>Stock Location Checker</title>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
     <style>
         body {
@@ -61,26 +61,26 @@
 </head>
 <body>
     <div class="container">
-        <h1>資料搜尋系統</h1>
+        <h1>Ward Stock Location Checker</h1>
         
-        <div id="loading">載入中...</div>
+        <div id="loading">Loading...</div>
         <div id="error" class="error"></div>
 
         <div class="search-group">
-            <label for="wardSelect">選擇病房：</label>
+            <label for="wardSelect">Ward:</label>
             <select id="wardSelect" onchange="updateItemCodes()">
-                <option value="">請選擇病房</option>
+                <option value="">Please select ward</option>
             </select>
         </div>
 
         <div class="search-group">
-            <label for="itemCodeSelect">選擇物品編號：</label>
+            <label for="itemCodeSelect">Item Code:</label>
             <select id="itemCodeSelect" onchange="searchLocation()" disabled>
-                <option value="">請先選擇病房</option>
+                <option value="">Please select ward first</option>
             </select>
         </div>
 
-        <button onclick="searchLocation()">搜尋位置</button>
+        <button onclick="searchLocation()">Search Location</button>
 
         <div id="result"></div>
     </div>
@@ -128,13 +128,13 @@
             } catch (error) {
                 console.error('Error loading data:', error);
                 loading.style.display = 'none';
-                document.getElementById('error').textContent = '載入數據時發生錯誤: ' + error.message;
+                document.getElementById('error').textContent = 'Error loading data: ' + error.message;
             }
         }
 
         function updateWardSelect() {
             const select = document.getElementById('wardSelect');
-            select.innerHTML = '<option value="">請選擇病房</option>';
+            select.innerHTML = '<option value="">Please select ward</option>';
             
             Array.from(wards).sort().forEach(ward => {
                 const option = document.createElement('option');
@@ -149,15 +149,15 @@
             const itemCodeSelect = document.getElementById('itemCodeSelect');
             const selectedWard = wardSelect.value;
 
-            itemCodeSelect.innerHTML = '<option value="">請選擇物品編號</option>';
+            itemCodeSelect.innerHTML = '<option value="">Please select item code</option>';
 
             if (selectedWard) {
-                // 獲取該病房的所有物品編號
+                // Get all item codes for selected ward
                 const wardItems = data
                     .filter(row => row.ward === selectedWard)
                     .map(row => row.itemCode);
 
-                // 排序並移除重複的物品編號
+                // Sort and remove duplicates
                 [...new Set(wardItems)].sort().forEach(itemCode => {
                     const option = document.createElement('option');
                     option.value = itemCode;
@@ -168,7 +168,7 @@
                 itemCodeSelect.disabled = false;
             } else {
                 itemCodeSelect.disabled = true;
-                itemCodeSelect.innerHTML = '<option value="">請先選擇病房</option>';
+                itemCodeSelect.innerHTML = '<option value="">Please select ward first</option>';
             }
         }
 
@@ -178,7 +178,7 @@
             const resultDiv = document.getElementById('result');
 
             if (!selectedWard || !selectedItemCode) {
-                resultDiv.innerHTML = '請選擇病房和物品編號';
+                resultDiv.innerHTML = 'Please select both ward and item code';
                 return;
             }
 
@@ -189,13 +189,13 @@
 
             if (found) {
                 resultDiv.innerHTML = `
-                    <h3>搜尋結果：</h3>
-                    <p>病房：${found.ward}</p>
-                    <p>物品編號：${found.itemCode}</p>
-                    <p>位置：${found.location}</p>
+                    <h3>Search Result:</h3>
+                    <p>Ward: ${found.ward}</p>
+                    <p>Item Code: ${found.itemCode}</p>
+                    <p>Location: ${found.location}</p>
                 `;
             } else {
-                resultDiv.innerHTML = '找不到符合的資料';
+                resultDiv.innerHTML = 'No matching records found';
             }
         }
     </script>
