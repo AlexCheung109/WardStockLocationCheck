@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Location Checker</title>
+    <title>Ward Stock System</title>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
     <style>
+        /* Original styles */
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
@@ -42,13 +43,13 @@
         button:hover {
             background-color: #45a049;
         }
-        #result {
+        #result, #cupboardResult {
             margin-top: 20px;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
         }
-        #loading {
+        #loading, #cupboardLoading {
             display: none;
             text-align: center;
             margin: 20px 0;
@@ -61,10 +62,43 @@
             font-weight: bold;
             font-size: 180%;
         }
+        /* Tab styles */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab-button {
+            padding: 10px 20px;
+            background-color: #ddd;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .tab-button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .cupboard-info {
+            margin-top: 10px;
+            font-size: 120%;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="tabs">
+        <button class="tab-button active" onclick="switchTab('binShelve', this)">Ward Stock Item Bin Shelve</button>
+        <button class="tab-button" onclick="switchTab('cupboard', this)">Ward Stock Cupboard</button>
+    </div>
+
+    <!-- Bin Shelve Tab -->
+    <div id="binShelveTab" class="tab-content active container">
         <h1>Ward Stock Item Bin Shelve Checker</h1>
         
         <div id="loading">Loading...</div>
@@ -89,14 +123,52 @@
         <div id="result"></div>
     </div>
 
+    <!-- Cupboard Tab -->
+    <div id="cupboardTab" class="tab-content container">
+        <h1>Ward Stock Cupboard Location</h1>
+
+        <div id="cupboardLoading">Loading...</div>
+        <div id="cupboardError" class="error"></div>
+
+        <div class="search-group">
+            <label for="cupboardWardSelect">Ward:</label>
+            <select id="cupboardWardSelect" onchange="searchCupboard()">
+                <option value="">Please select ward</option>
+            </select>
+        </div>
+
+        <div id="cupboardResult"></div>
+    </div>
+
     <script>
+        // Original variables
         let data = [];
         let wards = new Set();
+        
+        // New variables for cupboard
+        let cupboardData = [];
+        let cupboardWards = new Set();
 
         window.onload = function() {
             loadDataFromGitHub();
+            loadCupboardDataFromGitHub();
         };
 
+        function switchTab(tabId, button) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabId + 'Tab').classList.add('active');
+            button.classList.add('active');
+        }
+
+        // Original functions for Bin Shelve
         async function loadDataFromGitHub() {
             const loading = document.getElementById('loading');
             loading.style.display = 'block';
@@ -136,6 +208,79 @@
             }
         }
 
+        // New functions for Cupboard
+        async function loadCupboardDataFromGitHub() {
+            const loading = document.getElementById('cupboardLoading');
+            loading.style.display = 'block';
+
+            try {
+                const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/WardStockCupboard.xlsx';
+                
+                const response = await fetch(excelUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                cupboardData = XLSX.utils.sheet_to_json(worksheet, {
+                    header: ['ward', 'groupB', 'groupC', 'groupD'],
+                    range: 1
+                });
+
+                cupboardWards = new Set(cupboardData.map(row => row.ward));
+                updateCupboardWardSelect();
+                
+                loading.style.display = 'none';
+            } catch (error) {
+                console.error('Error loading cupboard data:', error);
+                loading.style.display = 'none';
+                document.getElementById('cupboardError').textContent = 'Error loading data: ' + error.message;
+            }
+        }
+
+        function updateCupboardWardSelect() {
+            const select = document.getElementById('cupboardWardSelect');
+            select.innerHTML = '<option value="">Please select ward</option>';
+            
+            Array.from(cupboardWards).sort().forEach(ward => {
+                const option = document.createElement('option');
+                option.value = ward;
+                option.textContent = ward;
+                select.appendChild(option);
+            });
+        }
+
+        function searchCupboard() {
+            const selectedWard = document.getElementById('cupboardWardSelect').value;
+            const resultDiv = document.getElementById('cupboardResult');
+
+            if (!selectedWard) {
+                resultDiv.innerHTML = 'Please select a ward';
+                return;
+            }
+
+            const found = cupboardData.find(row => row.ward === selectedWard);
+
+            if (found) {
+                resultDiv.innerHTML = `
+                    <h3>Cupboard Information:</h3>
+                    <div class="cupboard-info">
+                        <p><strong>Ward:</strong> ${found.ward}</p>
+                        <p><strong>Group B:</strong> ${found.groupB || 'N/A'}</p>
+                        <p><strong>Group C:</strong> ${found.groupC || 'N/A'}</p>
+                        <p><strong>Group D:</strong> ${found.groupD || 'N/A'}</p>
+                    </div>
+                `;
+            } else {
+                resultDiv.innerHTML = 'No cupboard information found for this ward';
+            }
+        }
+
+        // Original functions continued...
         function updateWardSelect() {
             const select = document.getElementById('wardSelect');
             select.innerHTML = '<option value="">Please select ward</option>';
@@ -156,12 +301,10 @@
             itemCodeSelect.innerHTML = '<option value="">Please select item code</option>';
 
             if (selectedWard) {
-                // Get all item codes for selected ward
                 const wardItems = data
                     .filter(row => row.ward === selectedWard)
                     .map(row => row.itemCode);
 
-                // Sort and remove duplicates
                 [...new Set(wardItems)].sort().forEach(itemCode => {
                     const option = document.createElement('option');
                     option.value = itemCode;
