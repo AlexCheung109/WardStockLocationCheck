@@ -6,7 +6,6 @@
     <title>Ward Stock System</title>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
     <style>
-        /* Original styles */
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
@@ -62,7 +61,6 @@
             font-weight: bold;
             font-size: 180%;
         }
-        /* Tab styles */
         .tabs {
             display: flex;
             gap: 10px;
@@ -85,9 +83,21 @@
         .tab-content.active {
             display: block;
         }
-        .cupboard-info {
-            margin-top: 10px;
-            font-size: 120%;
+        .ward-title {
+            font-size: 150%;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .location-label {
+            font-weight: normal;
+            margin-top: 15px;
+            margin-bottom: 5px;
+        }
+        .location-value {
+            font-size: 150%;
+            font-weight: bold;
+            margin-top: 5px;
+            margin-bottom: 15px;
         }
     </style>
 </head>
@@ -141,11 +151,8 @@
     </div>
 
     <script>
-        // Original variables
         let data = [];
         let wards = new Set();
-        
-        // New variables for cupboard
         let cupboardData = [];
         let cupboardWards = new Set();
 
@@ -155,7 +162,6 @@
         };
 
         function switchTab(tabId, button) {
-            // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
             });
@@ -163,12 +169,10 @@
                 btn.classList.remove('active');
             });
 
-            // Show selected tab
             document.getElementById(tabId + 'Tab').classList.add('active');
             button.classList.add('active');
         }
 
-        // Original functions for Bin Shelve
         async function loadDataFromGitHub() {
             const loading = document.getElementById('loading');
             loading.style.display = 'block';
@@ -208,7 +212,6 @@
             }
         }
 
-        // New functions for Cupboard
         async function loadCupboardDataFromGitHub() {
             const loading = document.getElementById('cupboardLoading');
             loading.style.display = 'block';
@@ -267,20 +270,19 @@
 
             if (found) {
                 resultDiv.innerHTML = `
-                    <h3>Cupboard Information:</h3>
-                    <div class="cupboard-info">
-                        <p><strong>Ward:</strong> ${found.ward}</p>
-                        <p><strong>Ward Stock Cupboard Location:</strong> ${found.groupB || 'N/A'}</p>
-                        <p><strong>Fridge Location:</strong> ${found.groupC || 'N/A'}</p>
-                        <p><strong>Conc.E Cupboard Location:</strong> ${found.groupD || 'N/A'}</p>
-                    </div>
+                    <p class="ward-title">Ward: ${found.ward}</p>
+                    <p class="location-label">Ward Stock Cupboard Location:</p>
+                    <p class="location-value">${found.groupB || 'N/A'}</p>
+                    <p class="location-label">Fridge:</p>
+                    <p class="location-value">${found.groupC || 'N/A'}</p>
+                    <p class="location-label">Concentrated Electrolyte Cupboard Location:</p>
+                    <p class="location-value">${found.groupD || 'N/A'}</p>
                 `;
             } else {
                 resultDiv.innerHTML = 'No cupboard information found for this ward';
             }
         }
 
-        // Original functions continued...
         function updateWardSelect() {
             const select = document.getElementById('wardSelect');
             select.innerHTML = '<option value="">Please select ward</option>';
