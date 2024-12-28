@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>資料搜尋系統</title>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .search-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        select, input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>資料搜尋系統</h1>
+        
+        <div id="loading">載入中...</div>
+
+        <div class="search-group">
+            <label for="wardSelect">選擇病房：</label>
+            <select id="wardSelect"></select>
+        </div>
+
+        <div class="search-group">
+            <label for="itemCode">輸入物品編號：</label>
+            <input type="text" id="itemCode" placeholder="請輸入物品編號">
+        </div>
+
+        <button onclick="searchLocation()">搜尋位置</button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        let data = [];
+        let wards = new Set();
+
+        window.onload = function() {
+            loadDataFromGitHub();
+        };
+
+        async function loadDataFromGitHub() {
+            const loading = document.getElementById('loading');
+            loading.style.display = 'block';
+
+            try {
+                const excelUrl = 'https://raw.githubusercontent.com/你的用户名/你的仓库名/main/你的文件名.xlsx';
+                
+                const response = await fetch(excelUrl);
+                const arrayBuffer = await response.arrayBuffer();
+                
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                // 修改後的數據讀取方式
+                data = XLSX.utils.sheet_to_json(worksheet, {
+                    header: ['ward', 'itemCode', 'c', 'd', 'e', 'f', 'location'],
+                    range: 1
+                });
+
+                // 只保留需要的欄位
+                data = data.map(row => ({
+                    ward: row.ward,
+                    itemCode: row.itemCode,
+                    location: row.location
+                }));
+
+                // 獲取所有不重複的病房
+                wards = new Set(data.map(row => row.ward));
+
+                // 更新下拉選單
+                updateWardSelect();
+                
+                loading.style.display = 'none';
+            } catch (error) {
+                console.error('Error loading data:', error);
+                loading.innerHTML = '載入數據時發生錯誤';
+            }
+        }
+
+        function updateWardSelect() {
+            const select = document.getElementById('wardSelect');
+            select.innerHTML = '<option value="">請選擇病房</option>';
+            
+            wards.forEach(ward => {
+                const option = document.createElement('option');
+                option.value = ward;
+                option.textContent = ward;
+                select.appendChild(option);
+            });
+        }
+
+        function searchLocation() {
+            const selectedWard = document.getElementById('wardSelect').value;
+            const itemCode = document.getElementById('itemCode').value.trim();
+            const resultDiv = document.getElementById('result');
+
+            if (!selectedWard || !itemCode) {
+                resultDiv.innerHTML = '請選擇病房並輸入物品編號';
+                return;
+            }
+
+            const found = data.find(row => 
+                row.ward === selectedWard && 
+                row.itemCode.toString() === itemCode
+            );
+
+            if (found) {
+                resultDiv.innerHTML = `
+                    <h3>搜尋結果：</h3>
+                    <p>病房：${found.ward}</p>
+                    <p>物品編號：${found.itemCode}</p>
+                    <p>位置：${found.location}</p>
+                `;
+            } else {
+                resultDiv.innerHTML = '找不到符合的資料';
+            }
+        }
+    </script>
+</body>
+</html>
