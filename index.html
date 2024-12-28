@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Location Checker</title>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .search-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .error {
+            color: red;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Ward Stock Location Checker</h1>
+        
+        <div id="loading">Loading...</div>
+        <div id="error" class="error"></div>
+
+        <div class="search-group">
+            <label for="wardSelect">Ward:</label>
+            <select id="wardSelect" onchange="updateItemCodes()">
+                <option value="">Please select ward</option>
+            </select>
+        </div>
+
+        <div class="search-group">
+            <label for="itemCodeSelect">Item Code:</label>
+            <select id="itemCodeSelect" onchange="searchLocation()" disabled>
+                <option value="">Please select ward first</option>
+            </select>
+        </div>
+
+        <button onclick="searchLocation()">Search Location</button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        let data = [];
+        let wards = new Set();
+
+        window.onload = function() {
+            loadDataFromGitHub();
+        };
+
+        async function loadDataFromGitHub() {
+            const loading = document.getElementById('loading');
+            loading.style.display = 'block';
+
+            try {
+                const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Location.xlsx';
+                
+                const response = await fetch(excelUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                data = XLSX.utils.sheet_to_json(worksheet, {
+                    header: ['ward', 'itemCode', 'c', 'd', 'e', 'f', 'location'],
+                    range: 1
+                });
+
+                data = data.map(row => ({
+                    ward: row.ward,
+                    itemCode: row.itemCode,
+                    location: row.location
+                }));
+
+                wards = new Set(data.map(row => row.ward));
+                updateWardSelect();
+                
+                loading.style.display = 'none';
+            } catch (error) {
+                console.error('Error loading data:', error);
+                loading.style.display = 'none';
+                document.getElementById('error').textContent = 'Error loading data: ' + error.message;
+            }
+        }
+
+        function updateWardSelect() {
+            const select = document.getElementById('wardSelect');
+            select.innerHTML = '<option value="">Please select ward</option>';
+            
+            Array.from(wards).sort().forEach(ward => {
+                const option = document.createElement('option');
+                option.value = ward;
+                option.textContent = ward;
+                select.appendChild(option);
+            });
+        }
+
+        function updateItemCodes() {
+            const wardSelect = document.getElementById('wardSelect');
+            const itemCodeSelect = document.getElementById('itemCodeSelect');
+            const selectedWard = wardSelect.value;
+
+            itemCodeSelect.innerHTML = '<option value="">Please select item code</option>';
+
+            if (selectedWard) {
+                // Get all item codes for selected ward
+                const wardItems = data
+                    .filter(row => row.ward === selectedWard)
+                    .map(row => row.itemCode);
+
+                // Sort and remove duplicates
+                [...new Set(wardItems)].sort().forEach(itemCode => {
+                    const option = document.createElement('option');
+                    option.value = itemCode;
+                    option.textContent = itemCode;
+                    itemCodeSelect.appendChild(option);
+                });
+
+                itemCodeSelect.disabled = false;
+            } else {
+                itemCodeSelect.disabled = true;
+                itemCodeSelect.innerHTML = '<option value="">Please select ward first</option>';
+            }
+        }
+
+        function searchLocation() {
+            const selectedWard = document.getElementById('wardSelect').value;
+            const selectedItemCode = document.getElementById('itemCodeSelect').value;
+            const resultDiv = document.getElementById('result');
+
+            if (!selectedWard || !selectedItemCode) {
+                resultDiv.innerHTML = 'Please select both ward and item code';
+                return;
+            }
+
+            const found = data.find(row => 
+                row.ward === selectedWard && 
+                row.itemCode.toString() === selectedItemCode
+            );
+
+            if (found) {
+                resultDiv.innerHTML = `
+                    <h3>Search Result:</h3>
+                    <p>Ward: ${found.ward}</p>
+                    <p>Item Code: ${found.itemCode}</p>
+                    <p>Location: ${found.location}</p>
+                `;
+            } else {
+                resultDiv.innerHTML = 'No matching records found';
+            }
+        }
+    </script>
+</body>
+</html>
