@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>資料搜尋系統</title>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .search-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .error {
+            color: red;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>資料搜尋系統</h1>
+        
+        <div id="loading">載入中...</div>
+        <div id="error" class="error"></div>
+
+        <div class="search-group">
+            <label for="wardSelect">選擇病房：</label>
+            <select id="wardSelect" onchange="updateItemCodes()">
+                <option value="">請選擇病房</option>
+            </select>
+        </div>
+
+        <div class="search-group">
+            <label for="itemCodeSelect">選擇物品編號：</label>
+            <select id="itemCodeSelect" onchange="searchLocation()" disabled>
+                <option value="">請先選擇病房</option>
+            </select>
+        </div>
+
+        <button onclick="searchLocation()">搜尋位置</button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        let data = [];
+        let wards = new Set();
+
+        window.onload = function() {
+            loadDataFromGitHub();
+        };
+
+        async function loadDataFromGitHub() {
+            const loading = document.getElementById('loading');
+            loading.style.display = 'block';
+
+            try {
+                const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Location.xlsx';
+                
+                const response = await fetch(excelUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                data = XLSX.utils.sheet_to_json(worksheet, {
+                    header: ['ward', 'itemCode', 'c', 'd', 'e', 'f', 'location'],
+                    range: 1
+                });
+
+                data = data.map(row => ({
+                    ward: row.ward,
+                    itemCode: row.itemCode,
+                    location: row.location
+                }));
+
+                wards = new Set(data.map(row => row.ward));
+                updateWardSelect();
+                
+                loading.style.display = 'none';
+            } catch (error) {
+                console.error('Error loading data:', error);
+                loading.style.display = 'none';
+                document.getElementById('error').textContent = '載入數據時發生錯誤: ' + error.message;
+            }
+        }
+
+        function updateWardSelect() {
+            const select = document.getElementById('wardSelect');
+            select.innerHTML = '<option value="">請選擇病房</option>';
+            
+            Array.from(wards).sort().forEach(ward => {
+                const option = document.createElement('option');
+                option.value = ward;
+                option.textContent = ward;
+                select.appendChild(option);
+            });
+        }
+
+        function updateItemCodes() {
+            const wardSelect = document.getElementById('wardSelect');
+            const itemCodeSelect = document.getElementById('itemCodeSelect');
+            const selectedWard = wardSelect.value;
+
+            itemCodeSelect.innerHTML = '<option value="">請選擇物品編號</option>';
+
+            if (selectedWard) {
+                // 獲取該病房的所有物品編號
+                const wardItems = data
+                    .filter(row => row.ward === selectedWard)
+                    .map(row => row.itemCode);
+
+                // 排序並移除重複的物品編號
+                [...new Set(wardItems)].sort().forEach(itemCode => {
+                    const option = document.createElement('option');
+                    option.value = itemCode;
+                    option.textContent = itemCode;
+                    itemCodeSelect.appendChild(option);
+                });
+
+                itemCodeSelect.disabled = false;
+            } else {
+                itemCodeSelect.disabled = true;
+                itemCodeSelect.innerHTML = '<option value="">請先選擇病房</option>';
+            }
+        }
+
+        function searchLocation() {
+            const selectedWard = document.getElementById('wardSelect').value;
+            const selectedItemCode = document.getElementById('itemCodeSelect').value;
+            const resultDiv = document.getElementById('result');
+
+            if (!selectedWard || !selectedItemCode) {
+                resultDiv.innerHTML = '請選擇病房和物品編號';
+                return;
+            }
+
+            const found = data.find(row => 
+                row.ward === selectedWard && 
+                row.itemCode.toString() === selectedItemCode
+            );
+
+            if (found) {
+                resultDiv.innerHTML = `
+                    <h3>搜尋結果：</h3>
+                    <p>病房：${found.ward}</p>
+                    <p>物品編號：${found.itemCode}</p>
+                    <p>位置：${found.location}</p>
+                `;
+            } else {
+                resultDiv.innerHTML = '找不到符合的資料';
+            }
+        }
+    </script>
+</body>
+</html>
