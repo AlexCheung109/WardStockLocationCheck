@@ -12,6 +12,20 @@
             margin: 0 auto;
             padding: 20px;
         }
+        .banner {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .banner-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 0;
+        }
         .container {
             background-color: #f5f5f5;
             padding: 20px;
@@ -72,6 +86,8 @@
             border: none;
             border-radius: 4px;
             cursor: pointer;
+            flex: 1;
+            white-space: nowrap;
         }
         .tab-button.active {
             background-color: #4CAF50;
@@ -114,6 +130,10 @@
         #scheduleImages img {
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             border-radius: 8px;
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 20px;
         }
         #dataCaptureScheduleTab {
             text-align: center;
@@ -121,9 +141,21 @@
         #dataCaptureScheduleTab h1 {
             text-align: left;
         }
+        @media (max-width: 600px) {
+            .tabs {
+                flex-direction: column;
+            }
+            .tab-button {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
+    <div class="banner">
+        <h1 class="banner-title">Top up Location Helper</h1>
+    </div>
+    
     <div class="tabs">
         <button class="tab-button active" onclick="switchTab('binShelve', this)">Ward Stock Item Bin Shelve</button>
         <button class="tab-button" onclick="switchTab('cupboard', this)">Ward Stock Cupboard</button>
@@ -181,8 +213,8 @@
         <h1>Data Capture Schedule</h1>
         <div id="dataCaptureUpdateInfo" class="update-info"></div>
         <div id="scheduleImages" style="display: flex; flex-direction: column; gap: 20px;">
-            <img id="schedule1" src="https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Top_up_schedule_p1.png" style="width: 100%; max-width: 100%; height: auto;" alt="Top-up Schedule Page 1">
-            <img id="schedule2" src="https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Top_up_schedule_p2.png" style="width: 100%; max-width: 100%; height: auto;" alt="Top-up Schedule Page 2">
+            <img id="schedule1" src="https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Top_up_schedule_p1.png" alt="Top-up Schedule Page 1">
+            <img id="schedule2" src="https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Top_up_schedule_p2.png" alt="Top-up Schedule Page 2">
         </div>
     </div>
 
@@ -214,26 +246,21 @@
         async function loadItemDescriptions() {
             try {
                 const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/item_phq.xlsx';
-                
                 const response = await fetch(excelUrl);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-
                 const arrayBuffer = await response.arrayBuffer();
                 const workbook = XLSX.read(arrayBuffer, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
-                
                 const itemData = XLSX.utils.sheet_to_json(worksheet, {
                     header: ['itemCode', 'description'],
                     range: 0
                 });
-
                 itemDescriptions = new Map(
                     itemData.map(row => [row.itemCode.toString(), row.description])
                 );
-
             } catch (error) {
                 console.error('Error loading item descriptions:', error);
                 document.getElementById('error').textContent = 'Error loading item descriptions: ' + error.message;
@@ -241,13 +268,11 @@
         }
 
         window.onload = async function() {
-            // Load the update dates
             const locationDate = await getFileLastUpdateDate('Location.xlsx');
             const cupboardDate = await getFileLastUpdateDate('WardStockCupboard.xlsx');
             const itemPhqDate = await getFileLastUpdateDate('item_phq.xlsx');
             const dataCaptureDate = await getFileLastUpdateDate('Top_up_schedule_p1.png');
             
-            // Display the update dates
             document.getElementById('binShelveUpdateInfo').textContent = 
                 `Bin shelve information last updated on: ${locationDate}`;
             document.getElementById('cupboardUpdateInfo').textContent = 
@@ -257,7 +282,6 @@
             document.getElementById('dataCaptureUpdateInfo').textContent = 
                 `Data Capture last updated on: ${dataCaptureDate}`;
 
-            // Load all data
             await Promise.all([
                 loadDataFromGitHub(),
                 loadCupboardDataFromGitHub(),
@@ -283,7 +307,6 @@
 
             try {
                 const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Location.xlsx';
-                
                 const response = await fetch(excelUrl);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -322,7 +345,6 @@
 
             try {
                 const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/WardStockCupboard.xlsx';
-                
                 const response = await fetch(excelUrl);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
