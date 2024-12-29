@@ -58,9 +58,10 @@
         }
         #result, #cupboardResult {
             margin-top: 20px;
-            padding: 10px;
+            padding: 15px;
             border: 1px solid #ddd;
             border-radius: 4px;
+            word-break: break-word;
         }
         #loading, #cupboardLoading {
             display: none;
@@ -121,11 +122,14 @@
             margin-bottom: 15px;
         }
         .item-description {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            white-space: normal;
+            word-wrap: break-word;
+            overflow: visible;
+            text-overflow: unset;
             max-width: 100%;
             display: block;
+            line-height: 1.4;
+            margin-bottom: 10px;
         }
         #scheduleImages img {
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -140,6 +144,9 @@
         }
         #dataCaptureScheduleTab h1 {
             text-align: left;
+        }
+        .result-item {
+            margin-bottom: 15px;
         }
         @media (max-width: 600px) {
             .tabs {
@@ -217,8 +224,7 @@
             <img id="schedule2" src="https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Top_up_schedule_p2.png" alt="Top-up Schedule Page 2">
         </div>
     </div>
-
-    <script>
+<script>
         let data = [];
         let wards = new Set();
         let cupboardData = [];
@@ -466,10 +472,20 @@
                 const itemDescription = itemDescriptions.get(selectedItemCode) || 'Description not found';
                 resultDiv.innerHTML = `
                     <h3>Search Result:</h3>
-                    <p>Ward: ${found.ward}</p>
-                    <p>Item Code: ${found.itemCode}</p>
-                    <p>Item Description: <span class="item-description">${itemDescription}</span></p>
-                    <p>Location: <span class="location-text">${found.location}</span></p>
+                    <div class="result-item">
+                        <strong>Ward:</strong> ${found.ward}
+                    </div>
+                    <div class="result-item">
+                        <strong>Item Code:</strong> ${found.itemCode}
+                    </div>
+                    <div class="result-item">
+                        <strong>Item Description:</strong><br>
+                        <span class="item-description">${itemDescription}</span>
+                    </div>
+                    <div class="result-item">
+                        <strong>Location:</strong><br>
+                        <span class="location-text">${found.location}</span>
+                    </div>
                 `;
             } else {
                 resultDiv.innerHTML = 'No matching records found';
