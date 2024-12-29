@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ward Stock System</title>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <!-- Include Mammoth.js via CDN for .docx to HTML conversion -->
+    <script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px; /* Increased width to accommodate new tab content */
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .search-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result, #cupboardResult, #topupScheduleContent {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #fff;
+        }
+        #loading, #cupboardLoading, #topupScheduleLoading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .error {
+            color: red;
+            margin: 10px 0;
+        }
+        .location-text {
+            font-weight: bold;
+            font-size: 180%;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap; /* Ensures tabs wrap on smaller screens */
+        }
+        .tab-button {
+            padding: 10px 20px;
+            background-color: #ddd;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            flex: 1; /* Equal width for all tabs */
+            text-align: center;
+        }
+        .tab-button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .ward-title {
+            font-size: 150%;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .location-label {
+            font-weight: normal;
+            margin-top: 15px;
+            margin-bottom: 5px;
+        }
+        .location-value {
+            font-size: 150%;
+            font-weight: bold;
+            margin-top: 5px;
+            margin-bottom: 15px;
+        }
+        .update-info {
+            font-style: italic;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        .item-description {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            display: block;
+        }
+        /* Banner Styling */
+        .banner {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            border-radius: 8px;
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            .tab-button {
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+            button {
+                width: 100%;
+            }
+            .banner {
+                font-size: 1.2em;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Banner -->
+    <div class="banner">
+        Top-up Location Helper
+    </div>
+
+    <div class="tabs">
+        <button class="tab-button active" onclick="switchTab('binShelve', this)">Ward Stock Item Bin Shelve</button>
+        <button class="tab-button" onclick="switchTab('cupboard', this)">Ward Stock Cupboard</button>
+        <button class="tab-button" onclick="switchTab('topupSchedule', this)">Top up Schedule</button>
+    </div>
+
+    <!-- Bin Shelve Tab -->
+    <div id="binShelveTab" class="tab-content active container">
+        <h1>Ward Stock Item Bin Shelve Checker</h1>
+        <div id="binShelveUpdateInfo" class="update-info"></div>
+        <div id="itemPhqUpdateInfo" class="update-info"></div>
+        
+        <div id="loading">Loading...</div>
+        <div id="error" class="error"></div>
+
+        <div class="search-group">
+            <label for="wardSelect">Ward:</label>
+            <select id="wardSelect" onchange="updateItemCodes()">
+                <option value="">Please select ward</option>
+            </select>
+        </div>
+
+        <div class="search-group">
+            <label for="itemCodeSelect">Item Code:</label>
+            <select id="itemCodeSelect" onchange="searchLocation()" disabled>
+                <option value="">Please select ward first</option>
+            </select>
+        </div>
+
+        <button onclick="searchLocation()">Search Location</button>
+
+        <div id="result"></div>
+    </div>
+
+    <!-- Cupboard Tab -->
+    <div id="cupboardTab" class="tab-content container">
+        <h1>Ward Stock Cupboard Location</h1>
+        <div id="cupboardUpdateInfo" class="update-info"></div>
+
+        <div id="cupboardLoading">Loading...</div>
+        <div id="cupboardError" class="error"></div>
+
+        <div class="search-group">
+            <label for="cupboardWardSelect">Ward:</label>
+            <select id="cupboardWardSelect" onchange="searchCupboard()">
+                <option value="">Please select ward</option>
+            </select>
+        </div>
+
+        <div id="cupboardResult"></div>
+    </div>
+
+    <!-- Top up Schedule Tab -->
+    <div id="topupScheduleTab" class="tab-content container">
+        <h1>Top up Schedule</h1>
+        <div id="topupScheduleUpdateInfo" class="update-info"></div>
+
+        <div id="topupScheduleLoading">Loading...</div>
+        <div id="topupScheduleError" class="error"></div>
+
+        <div id="topupScheduleContent"></div>
+    </div>
+
+    <script>
+        let data = [];
+        let wards = new Set();
+        let cupboardData = [];
+        let cupboardWards = new Set();
+        let itemDescriptions = new Map();
+
+        // GitHub Repository Information
+        const repoOwner = 'AlexCheung109';
+        const repoName = 'WardStockLocationCheck';
+        const branch = 'main';
+
+        // Function to get the last update date of a file from GitHub
+        async function getFileLastUpdateDate(filename) {
+            try {
+                const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/commits?path=${filename}&page=1&per_page=1`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                if (data.length > 0) {
+                    const date = new Date(data[0].commit.committer.date);
+                    return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
+                }
+                return 'Date not available';
+            } catch (error) {
+                console.error('Error fetching file update date:', error);
+                return 'Date not available';
+            }
+        }
+
+        // Function to load item descriptions from item_phq.xlsx
+        async function loadItemDescriptions() {
+            try {
+                const excelUrl = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/item_phq.xlsx`;
+                
+                const response = await fetch(excelUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                const itemData = XLSX.utils.sheet_to_json(worksheet, {
+                    header: ['itemCode', 'description'],
+                    range: 0
+                });
+
+                itemDescriptions = new Map(
+                    itemData.map(row => [row.itemCode.toString(), row.description])
+                );
+
+            } catch (error) {
+                console.error('Error loading item descriptions:', error);
+                document.getElementById('error').textContent = 'Error loading item descriptions: ' + error.message;
+            }
+        }
+
+        window.onload = async function() {
+            // Load the update dates
+            const locationDate = await getFileLastUpdateDate('Location.xlsx');
+            const cupboardDate = await getFileLastUpdateDate('WardStockCupboard.xlsx');
+            const itemPhqDate = await getFileLastUpdateDate('item_phq.xlsx');
+            const topupScheduleDate = await getFileLastUpdateDate('Topup_schedule.docx');
+
+            // Display the update dates
+            document.getElementById('binShelveUpdateInfo').textContent = 
+                `Bin shelve information last updated on: ${locationDate}`;
+            document.getElementById('cupboardUpdateInfo').textContent = 
+                `Ward Stock Cupboard information last updated on: ${cupboardDate}`;
+            document.getElementById('itemPhqUpdateInfo').textContent = 
+                `Item_phq.xlsx last updated on: ${itemPhqDate}`;
+            document.getElementById('topupScheduleUpdateInfo').textContent = 
+                `Top up Schedule document last updated on: ${topupScheduleDate}`;
+
+            // Load all data
+            await Promise.all([
+                loadDataFromGitHub(),
+                loadCupboardDataFromGitHub(),
+                loadItemDescriptions(),
+                loadTopupScheduleContent()
+            ]);
+        };
+
+        // Function to switch tabs
+        function switchTab(tabId, button) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            document.getElementById(tabId + 'Tab').classList.add('active');
+            button.classList.add('active');
+        }
+
+        // Function to load data from Location.xlsx
+        async function loadDataFromGitHub() {
+            const loading = document.getElementById('loading');
+            loading.style.display = 'block';
+
+            try {
+                const excelUrl = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/Location.xlsx`;
+                
+                const response = await fetch(excelUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                data = XLSX.utils.sheet_to_json(worksheet, {
+                    header: ['ward', 'itemCode', 'c', 'd', 'e', 'f', 'location'],
+                    range: 1
+                });
+
+                data = data.map(row => ({
+                    ward: row.ward,
+                    itemCode: row.itemCode,
+                    location: row.location
+                }));
+
+                wards = new Set(data.map(row => row.ward));
+                updateWardSelect();
+                
+                loading.style.display = 'none';
+            } catch (error) {
+                console.error('Error loading data:', error);
+                loading.style.display = 'none';
+                document.getElementById('error').textContent = 'Error loading data: ' + error.message;
+            }
+        }
+
+        // Function to load cupboard data from WardStockCupboard.xlsx
+        async function loadCupboardDataFromGitHub() {
+            const loading = document.getElementById('cupboardLoading');
+            loading.style.display = 'block';
+
+            try {
+                const excelUrl = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/WardStockCupboard.xlsx`;
+                
+                const response = await fetch(excelUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                cupboardData = XLSX.utils.sheet_to_json(worksheet, {
+                    header: ['ward', 'groupB', 'groupC', 'groupD'],
+                    range: 1
+                });
+
+                cupboardWards = new Set(cupboardData.map(row => row.ward));
+                updateCupboardWardSelect();
+                
+                loading.style.display = 'none';
+            } catch (error) {
+                console.error('Error loading cupboard data:', error);
+                loading.style.display = 'none';
+                document.getElementById('cupboardError').textContent = 'Error loading cupboard data: ' + error.message;
+            }
+        }
+
+        // Function to load Top up Schedule content using Mammoth.js
+        async function loadTopupScheduleContent() {
+            const loading = document.getElementById('topupScheduleLoading');
+            const errorDiv = document.getElementById('topupScheduleError');
+            const contentDiv = document.getElementById('topupScheduleContent');
+            loading.style.display = 'block';
+            errorDiv.textContent = '';
+            contentDiv.innerHTML = '';
+
+            try {
+                const docUrl = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/Topup_schedule.docx`;
+
+                // Fetch the .docx file as an ArrayBuffer
+                const response = await fetch(docUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+
+                // Use Mammoth.js to convert .docx to HTML
+                const result = await mammoth.convertToHtml({arrayBuffer: arrayBuffer});
+                const html = result.value; // The generated HTML
+
+                // Display the HTML content
+                contentDiv.innerHTML = html;
+
+                // Optionally, handle any messages (warnings, etc.)
+                if (result.messages.length > 0) {
+                    console.warn('Mammoth messages:', result.messages);
+                }
+
+                loading.style.display = 'none';
+            } catch (error) {
+                console.error('Error loading Top up Schedule:', error);
+                loading.style.display = 'none';
+                errorDiv.textContent = 'Error loading Top up Schedule: ' + error.message;
+            }
+        }
+
+        // Function to update ward select in Bin Shelve Tab
+        function updateWardSelect() {
+            const select = document.getElementById('wardSelect');
+            select.innerHTML = '<option value="">Please select ward</option>';
+            
+            Array.from(wards).sort().forEach(ward => {
+                const option = document.createElement('option');
+                option.value = ward;
+                option.textContent = ward;
+                select.appendChild(option);
+            });
+        }
+
+        // Function to update ward select in Cupboard Tab
+        function updateCupboardWardSelect() {
+            const select = document.getElementById('cupboardWardSelect');
+            select.innerHTML = '<option value="">Please select ward</option>';
+            
+            Array.from(cupboardWards).sort().forEach(ward => {
+                const option = document.createElement('option');
+                option.value = ward;
+                option.textContent = ward;
+                select.appendChild(option);
+            });
+        }
+
+        // Function to update item codes based on selected ward
+        function updateItemCodes() {
+            const wardSelect = document.getElementById('wardSelect');
+            const itemCodeSelect = document.getElementById('itemCodeSelect');
+            const selectedWard = wardSelect.value;
+
+            itemCodeSelect.innerHTML = '<option value="">Please select item code</option>';
+
+            if (selectedWard) {
+                const wardItems = data
+                    .filter(row => row.ward === selectedWard)
+                    .map(row => row.itemCode);
+
+                [...new Set(wardItems)].sort().forEach(itemCode => {
+                    const option = document.createElement('option');
+                    option.value = itemCode;
+                    option.textContent = itemCode;
+                    itemCodeSelect.appendChild(option);
+                });
+
+                itemCodeSelect.disabled = false;
+            } else {
+                itemCodeSelect.disabled = true;
+                itemCodeSelect.innerHTML = '<option value="">Please select ward first</option>';
+            }
+        }
+
+        // Function to search location in Bin Shelve Tab
+        function searchLocation() {
+            const selectedWard = document.getElementById('wardSelect').value;
+            const selectedItemCode = document.getElementById('itemCodeSelect').value;
+            const resultDiv = document.getElementById('result');
+
+            if (!selectedWard || !selectedItemCode) {
+                resultDiv.innerHTML = '<span class="error">Please select both ward and item code.</span>';
+                return;
+            }
+
+            const found = data.find(row => 
+                row.ward === selectedWard && 
+                row.itemCode.toString() === selectedItemCode
+            );
+
+            if (found) {
+                const itemDescription = itemDescriptions.get(selectedItemCode) || 'Description not found';
+                resultDiv.innerHTML = `
+                    <h3>Search Result:</h3>
+                    <p><strong>Ward:</strong> ${found.ward}</p>
+                    <p><strong>Item Code:</strong> ${found.itemCode}</p>
+                    <p><strong>Item Description:</strong> <span class="item-description">${itemDescription}</span></p>
+                    <p><strong>Location:</strong> <span class="location-text">${found.location}</span></p>
+                `;
+            } else {
+                resultDiv.innerHTML = '<span class="error">No matching records found.</span>';
+            }
+        }
+
+        // Function to search cupboard location in Cupboard Tab
+        function searchCupboard() {
+            const selectedWard = document.getElementById('cupboardWardSelect').value;
+            const resultDiv = document.getElementById('cupboardResult');
+
+            if (!selectedWard) {
+                resultDiv.innerHTML = '<span class="error">Please select a ward.</span>';
+                return;
+            }
+
+            const found = cupboardData.find(row => row.ward === selectedWard);
+
+            if (found) {
+                resultDiv.innerHTML = `
+                    <p class="ward-title">Ward: ${found.ward}</p>
+                    <p class="location-label">Ward Stock Cupboard Location:</p>
+                    <p class="location-value">${found.groupB || 'N/A'}</p>
+                    <p class="location-label">Fridge Location:</p>
+                    <p class="location-value">${found.groupC || 'N/A'}</p>
+                    <p class="location-label">Concentrated Electrolyte Cupboard Location:</p>
+                    <p class="location-value">${found.groupD || 'N/A'}</p>
+                `;
+            } else {
+                resultDiv.innerHTML = '<span class="error">No cupboard information found for this ward.</span>';
+            }
+        }
+    </script>
+</body>
+</html>
