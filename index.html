@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ward Stock System</title>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <!-- Include QRious Library for QR Code Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -148,6 +150,24 @@
         .result-item {
             margin-bottom: 15px;
         }
+        /* QR Code Container Style */
+        .qr-code {
+            margin-top: 20px;
+            text-align: center;
+        }
+        /* Description Text Style */
+        .qr-description {
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #333;
+        }
+        /* Item Code Text Style */
+        .item-code {
+            margin-top: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
         @media (max-width: 600px) {
             .tabs {
                 flex-direction: column;
@@ -160,7 +180,7 @@
 </head>
 <body>
     <div class="banner">
-        <h1 class="banner-title">Top up Location Helper</h1>
+        <h1 class="banner-title">Top-up Location Helper</h1>
     </div>
     
     <div class="tabs">
@@ -181,20 +201,22 @@
         <div class="search-group">
             <label for="wardSelect">Ward:</label>
             <select id="wardSelect" onchange="updateItemCodes()">
-                <option value="">Please select ward</option>
+                <option value="">Please select a ward</option>
             </select>
         </div>
 
         <div class="search-group">
             <label for="itemCodeSelect">Item Code:</label>
             <select id="itemCodeSelect" onchange="searchLocation()" disabled>
-                <option value="">Please select ward first</option>
+                <option value="">Please select a ward first</option>
             </select>
         </div>
 
         <button onclick="searchLocation()">Search Location</button>
 
         <div id="result"></div>
+        <!-- QR Code Container -->
+        <div id="qrCodeContainer" class="qr-code"></div>
     </div>
 
     <!-- Cupboard Tab -->
@@ -208,7 +230,7 @@
         <div class="search-group">
             <label for="cupboardWardSelect">Ward:</label>
             <select id="cupboardWardSelect" onchange="searchCupboard()">
-                <option value="">Please select ward</option>
+                <option value="">Please select a ward</option>
             </select>
         </div>
 
@@ -361,10 +383,19 @@
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
                 
+                // 修改 header 以映射到 A, H, I, J, K 列
                 cupboardData = XLSX.utils.sheet_to_json(worksheet, {
-                    header: ['ward', 'groupB', 'groupC', 'groupD'],
+                    header: ['ward', 'ignore1', 'ignore2', 'ignore3', 'ignore4', 'ignore5', 'ignore6', 'wardStockCupboardLocation', 'fridgeLocation', 'concentratedElectrolyteCupboardLocation', 'remark'],
                     range: 1
                 });
+
+                cupboardData = cupboardData.map(row => ({
+                    ward: row.ward,
+                    wardStockCupboardLocation: row.wardStockCupboardLocation,
+                    fridgeLocation: row.fridgeLocation,
+                    concentratedElectrolyteCupboardLocation: row.concentratedElectrolyteCupboardLocation,
+                    remark: row.remark
+                }));
 
                 cupboardWards = new Set(cupboardData.map(row => row.ward));
                 updateCupboardWardSelect();
@@ -373,13 +404,13 @@
             } catch (error) {
                 console.error('Error loading cupboard data:', error);
                 loading.style.display = 'none';
-                document.getElementById('cupboardError').textContent = 'Error loading data: ' + error.message;
+                document.getElementById('cupboardError').textContent = 'Error loading cupboard data: ' + error.message;
             }
         }
 
         function updateCupboardWardSelect() {
             const select = document.getElementById('cupboardWardSelect');
-            select.innerHTML = '<option value="">Please select ward</option>';
+            select.innerHTML = '<option value="">Please select a ward</option>';
             
             Array.from(cupboardWards).sort().forEach(ward => {
                 const option = document.createElement('option');
@@ -401,15 +432,25 @@
             const found = cupboardData.find(row => row.ward === selectedWard);
 
             if (found) {
-                resultDiv.innerHTML = `
+                let resultHTML = `
                     <p class="ward-title">Ward: ${found.ward}</p>
                     <p class="location-label">Ward Stock Cupboard Location:</p>
-                    <p class="location-value">${found.groupB || 'N/A'}</p>
+                    <p class="location-value">${found.wardStockCupboardLocation || 'N/A'}</p>
                     <p class="location-label">Fridge Location:</p>
-                    <p class="location-value">${found.groupC || 'N/A'}</p>
+                    <p class="location-value">${found.fridgeLocation || 'N/A'}</p>
                     <p class="location-label">Concentrated Electrolyte Cupboard Location:</p>
-                    <p class="location-value">${found.groupD || 'N/A'}</p>
+                    <p class="location-value">${found.concentratedElectrolyteCupboardLocation || 'N/A'}</p>
                 `;
+
+                // 新增 Remark 部分
+                if (found.remark && found.remark.trim() !== '') {
+                    resultHTML += `
+                        <p class="location-label">Remark:</p>
+                        <p class="location-value">${found.remark}</p>
+                    `;
+                }
+
+                resultDiv.innerHTML = resultHTML;
             } else {
                 resultDiv.innerHTML = 'No cupboard information found for this ward';
             }
@@ -417,7 +458,7 @@
 
         function updateWardSelect() {
             const select = document.getElementById('wardSelect');
-            select.innerHTML = '<option value="">Please select ward</option>';
+            select.innerHTML = '<option value="">Please select a ward</option>';
             
             Array.from(wards).sort().forEach(ward => {
                 const option = document.createElement('option');
@@ -432,7 +473,7 @@
             const itemCodeSelect = document.getElementById('itemCodeSelect');
             const selectedWard = wardSelect.value;
 
-            itemCodeSelect.innerHTML = '<option value="">Please select item code</option>';
+            itemCodeSelect.innerHTML = '<option value="">Please select an item code</option>';
 
             if (selectedWard) {
                 const wardItems = data
@@ -449,7 +490,7 @@
                 itemCodeSelect.disabled = false;
             } else {
                 itemCodeSelect.disabled = true;
-                itemCodeSelect.innerHTML = '<option value="">Please select ward first</option>';
+                itemCodeSelect.innerHTML = '<option value="">Please select a ward first</option>';
             }
         }
 
@@ -457,6 +498,10 @@
             const selectedWard = document.getElementById('wardSelect').value;
             const selectedItemCode = document.getElementById('itemCodeSelect').value;
             const resultDiv = document.getElementById('result');
+            const qrCodeContainer = document.getElementById('qrCodeContainer');
+
+            // Clear previous QR code and descriptions
+            qrCodeContainer.innerHTML = '';
 
             if (!selectedWard || !selectedItemCode) {
                 resultDiv.innerHTML = 'Please select both ward and item code';
@@ -487,6 +532,42 @@
                         <span class="location-text">${found.location}</span>
                     </div>
                 `;
+
+                // Check if selected ward is B6 or D6 AND location starts with '**E'
+                if ((selectedWard.toUpperCase() === 'B6' || selectedWard.toUpperCase() === 'D6') && found.location.startsWith('**E')) {
+                    // Create description text above QR code
+                    const description = document.createElement('p');
+                    description.className = 'qr-description';
+                    description.textContent = 'You can use the ICU E Locker\'s scan function to scan this QR code to open the door directly.';
+                    
+                    // Append description to QR code container
+                    qrCodeContainer.appendChild(description);
+
+                    // Generate QR code
+                    const qr = new QRious({
+                        value: selectedItemCode,
+                        size: 150
+                    });
+
+                    // Create an <img> element to display the QR code
+                    const img = document.createElement('img');
+                    img.src = qr.toDataURL();
+                    img.alt = `QR Code for Item Code ${selectedItemCode}`;
+                    img.style.marginTop = '10px';
+                    img.style.width = '150px';
+                    img.style.height = '150px';
+
+                    // Append QR code image to container
+                    qrCodeContainer.appendChild(img);
+
+                    // Create Item Code text below QR code
+                    const itemCodeText = document.createElement('p');
+                    itemCodeText.className = 'item-code';
+                    itemCodeText.textContent = `Item Code: ${selectedItemCode}`;
+
+                    // Append Item Code text to container
+                    qrCodeContainer.appendChild(itemCodeText);
+                }
             } else {
                 resultDiv.innerHTML = 'No matching records found';
             }
