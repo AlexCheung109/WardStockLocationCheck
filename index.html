@@ -83,6 +83,7 @@
             display: flex;
             gap: 10px;
             margin-bottom: 20px;
+            flex-wrap: wrap; /* Allow wrapping if needed */
         }
         .tab-button {
             padding: 10px 20px;
@@ -92,6 +93,7 @@
             cursor: pointer;
             flex: 1;
             white-space: nowrap;
+            text-align: center;
         }
         .tab-button.active {
             background-color: #4CAF50;
@@ -225,6 +227,15 @@
         .wardDropdown {
             margin-top: 10px;
         }
+        /* Responsive Tabs: Switch to vertical on small screens */
+        @media (max-width: 600px) {
+            .tabs {
+                flex-direction: column;
+            }
+            .tab-button {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
@@ -326,7 +337,8 @@
                         <option value="Friday">Friday</option>
                     </select>
                 </div>
-                <div class="search-group">
+                <!-- Hidden Scanner Group -->
+                <div class="search-group hidden scanner-group">
                     <label for="scannerTextbox">Scanner:</label>
                     <input type="text" id="scannerTextbox" readonly>
                 </div>
