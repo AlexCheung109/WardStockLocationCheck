@@ -135,6 +135,7 @@
             display: block;
             line-height: 1.4;
             margin-bottom: 10px;
+            font-size: 50%; /* Reduced font size by half */
         }
         #scheduleImages img {
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -260,19 +261,19 @@
 
         <div class="search-group">
             <label for="wardSelect">Ward:</label>
-            <select id="wardSelect" onchange="updateItemCodes()">
+            <select id="wardSelect" onchange="displayItemCodes()">
                 <option value="">Please select a ward</option>
             </select>
         </div>
 
+        <!-- Item Code Filter -->
         <div class="search-group">
-            <label for="itemCodeSelect">Item Code:</label>
-            <select id="itemCodeSelect" onchange="searchLocation()" disabled>
-                <option value="">Please select a ward first</option>
-            </select>
+            <label for="itemCodeFilter">Filter by Item Code:</label>
+            <input type="text" id="itemCodeFilter" placeholder="Enter Item Code" oninput="filterItemCodes()">
         </div>
 
-        <button onclick="searchLocation()">Search Location</button>
+        <!-- Removed the Item Code Select and Search Button -->
+        <!-- The item codes will be displayed automatically upon ward selection -->
 
         <div id="result"></div>
         <!-- QR Code Container -->
@@ -302,8 +303,8 @@
         <h1>Data Capture Schedule</h1>
         <div id="dataCaptureUpdateInfo" class="update-info"></div>
         <div class="schedule-buttons">
-            <button onclick="showFullSchedule()">Inquire about Data Capture Schedule</button>
-            <button onclick="showDutyQuery()">Inquire about Data Capture Schedule according to Duty</button>
+            <button onclick="showFullSchedule()">View Full Data Capture Schedule</button>
+            <button onclick="showDutyQuery()">Inquire According to Duty</button>
         </div>
         <!-- Full Schedule Section -->
         <div id="fullSchedule" class="hidden">
@@ -315,7 +316,7 @@
         <!-- Duty Query Section -->
         <div id="dutyQuery" class="hidden">
             <div class="duty-query-form">
-                <h2>按Duty查詢Data Capture Schedule</h2>
+                <h2>Inquire According to Duty</h2>
                 <div class="search-group">
                     <label for="dutySelect">Duty:</label>
                     <select id="dutySelect">
@@ -392,9 +393,9 @@
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            const data = await response.json();
-            if (data.length > 0) {
-                const date = new Date(data[0].commit.committer.date);
+            const dataResponse = await response.json();
+            if (dataResponse.length > 0) {
+                const date = new Date(dataResponse[0].commit.committer.date);
                 return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
             }
             return 'Date not available';
@@ -420,12 +421,20 @@
                 range: 0
             });
             itemDescriptions = new Map(
-                itemData.map(row => [row.itemCode.toString(), row.description])
+                itemData.map(row => [row.itemCode.toString(), shortenDescription(row.description)])
             );
         } catch (error) {
             console.error('Error loading item descriptions:', error);
             document.getElementById('error').textContent = 'Error loading item descriptions: ' + error.message;
         }
+    }
+
+    // Function to shorten descriptions while preserving meaning
+    function shortenDescription(description) {
+        // Simple example: truncate to 50 characters and add ellipsis
+        if (!description) return 'No description available';
+        if (description.length <= 50) return description;
+        return description.substring(0, 50) + '...';
     }
 
     window.onload = async function() {
@@ -446,7 +455,8 @@
         await Promise.all([
             loadDataFromGitHub(),
             loadCupboardDataFromGitHub(),
-            loadItemDescriptions()
+            loadItemDescriptions(),
+            autoSelectWeekday()
         ]);
     };
 
@@ -638,30 +648,120 @@
         return 0;
     }
 
-    function updateItemCodes() {
-        const wardSelect = document.getElementById('wardSelect');
-        const itemCodeSelect = document.getElementById('itemCodeSelect');
-        const selectedWard = wardSelect.value;
+    // Function to display item codes as clickable accordions
+    function displayItemCodes() {
+        const selectedWard = document.getElementById('wardSelect').value;
+        const resultDiv = document.getElementById('result');
 
-        itemCodeSelect.innerHTML = '<option value="">Please select an item code</option>';
+        // Clear previous results
+        resultDiv.innerHTML = '';
+        document.getElementById('qrCodeContainer').innerHTML = '';
 
-        if (selectedWard) {
-            const wardItems = data
-                .filter(row => row.ward === selectedWard)
-                .map(row => row.itemCode);
+        if (!selectedWard) {
+            resultDiv.innerHTML = 'Please select a ward';
+            return;
+        }
 
-            [...new Set(wardItems)].sort().forEach(itemCode => {
-                const option = document.createElement('option');
-                option.value = itemCode;
-                option.textContent = itemCode;
-                itemCodeSelect.appendChild(option);
+        // Fetch all item codes for the selected ward
+        const wardItems = data
+            .filter(row => row.ward === selectedWard)
+            .map(row => row.itemCode)
+            .filter(itemCode => itemCode) // Remove empty item codes
+            .sort(); // Sort A-Z
+
+        if (wardItems.length > 0) {
+            // Remove duplicates
+            const uniqueItemCodes = [...new Set(wardItems)];
+
+            // Sort unique item codes A-Z
+            uniqueItemCodes.sort();
+
+            // Create accordion-style details elements
+            let itemListHTML = `<h3>Item Codes in Ward ${selectedWard}:</h3>`;
+            uniqueItemCodes.forEach(itemCode => {
+                const found = data.find(row => row.ward === selectedWard && row.itemCode.toString() === itemCode.toString());
+                if (found) {
+                    itemListHTML += `
+                        <details>
+                            <summary>${itemCode}</summary>
+                            <div class="wardDropdown">
+                                <p class="ward-title">Ward: ${found.ward}</p>
+                                <p class="location-label">Item Code:</p>
+                                <p class="location-value">${found.itemCode}</p>
+                                <p class="location-label">Item Description:</p>
+                                <p class="item-description">${itemDescriptions.get(found.itemCode) || 'No description available'}</p>
+                                <p class="location-label">Location:</p>
+                                <p class="location-value">${found.location || 'N/A'}</p>
+                                
+                                <!-- 新增的描述和 QR Code 區塊 -->
+                                ${ ( (selectedWard.toUpperCase() === 'B6' || selectedWard.toUpperCase() === 'D6') && 
+                                     (found.location.startsWith('***E') || found.location.startsWith('**E')) ) ? `
+                                    <p class="location-label">Description:</p>
+                                    <p class="location-value">Scan it to open the drug locker directly.</p>
+                                    
+                                    <div class="qr-code">
+                                        <canvas id="qr-${itemCode}"></canvas>
+                                        <p class="item-code">Item Code: ${itemCode}</p>
+                                    </div>
+                                ` : ''}
+                                
+                            </div>
+                        </details>
+                    `;
+                }
+            });
+            resultDiv.innerHTML = itemListHTML;
+
+            // Enforce single-open accordion behavior
+            document.querySelectorAll('#result details').forEach(details => {
+                details.addEventListener('toggle', function() {
+                    if (this.open) {
+                        document.querySelectorAll('#result details').forEach(d => {
+                            if (d !== this) d.open = false;
+                        });
+                    }
+                });
             });
 
-            itemCodeSelect.disabled = false;
+            // 生成 QR Code
+            generateQRCodes(selectedWard, uniqueItemCodes);
         } else {
-            itemCodeSelect.disabled = true;
-            itemCodeSelect.innerHTML = '<option value="">Please select a ward first</option>';
+            resultDiv.innerHTML = 'No item codes found for this ward';
         }
+    }
+
+    // 新增的函數，用於生成 QR Code
+    function generateQRCodes(selectedWard, uniqueItemCodes) {
+        uniqueItemCodes.forEach(itemCode => {
+            const found = data.find(row => row.ward === selectedWard && row.itemCode.toString() === itemCode.toString());
+            if (found && (selectedWard.toUpperCase() === 'B6' || selectedWard.toUpperCase() === 'D6') && 
+                (found.location.startsWith('***E') || found.location.startsWith('**E'))) {
+                const qrCanvas = document.getElementById(`qr-${itemCode}`);
+                if (qrCanvas) {
+                    // 使用 QRious 生成 QR Code
+                    new QRious({
+                        element: qrCanvas,
+                        value: itemCode.toString(),
+                        size: 150
+                    });
+                }
+            }
+        });
+    }
+
+    // Function to filter item codes based on input
+    function filterItemCodes() {
+        const filterValue = document.getElementById('itemCodeFilter').value.toLowerCase();
+        const detailsElements = document.querySelectorAll('#result details');
+
+        detailsElements.forEach(details => {
+            const summary = details.querySelector('summary').textContent.toLowerCase();
+            if (summary.includes(filterValue)) {
+                details.style.display = '';
+            } else {
+                details.style.display = 'none';
+            }
+        });
     }
 
     function searchLocation() {
@@ -684,7 +784,7 @@
         );
 
         if (found) {
-            const itemDescription = itemDescriptions.get(selectedItemCode) || 'Description not found';
+            const itemDescription = itemDescriptions.get(selectedItemCode) || 'No description available';
             resultDiv.innerHTML = `
                 <h3>Search Result:</h3>
                 <div class="result-item">
@@ -703,13 +803,13 @@
                 </div>
             `;
 
-            // Check if selected ward is B6 or D6 AND location starts with '**E'
-            if ((selectedWard.toUpperCase() === 'B6' || selectedWard.toUpperCase() === 'D6') && found.location.startsWith('**E')) {
+            // Check if selected ward is B6 or D6 AND location starts with '***E'
+            if ((selectedWard.toUpperCase() === 'B6' || selectedWard.toUpperCase() === 'D6') && found.location.startsWith('***E')) {
                 // Create description text above QR code
                 const description = document.createElement('p');
                 description.className = 'qr-description';
-                description.textContent = 'You can use the ICU E Locker\'s scan function to scan this QR code to open the door directly.';
-                
+                description.textContent = 'Scan it to open the drug locker directly.';
+
                 // Append description to QR code container
                 qrCodeContainer.appendChild(description);
 
@@ -726,6 +826,9 @@
                 img.style.marginTop = '10px';
                 img.style.width = '150px';
                 img.style.height = '150px';
+                img.style.display = 'block';
+                img.style.marginLeft = 'auto';
+                img.style.marginRight = 'auto';
 
                 // Append QR code image to container
                 qrCodeContainer.appendChild(img);
@@ -836,7 +939,7 @@
             });
             resultDiv.innerHTML = wardListHTML;
 
-            // Add event listeners to enforce single-open accordion behavior
+            // Enforce single-open accordion behavior
             document.querySelectorAll('#dutyQueryResult details').forEach(details => {
                 details.addEventListener('toggle', function() {
                     if (this.open) {
@@ -851,36 +954,21 @@
         }
     }
 
-    // Helper function to parse ward into letters, number, and suffix
-    function parseWard(ward) {
-        const match = ward.match(/^([A-Za-z]+)(\d+)(.*)$/);
-        if (match) {
-            const letters = match[1].toUpperCase();
-            const number = parseInt(match[2], 10);
-            const suffix = match[3].toUpperCase();
-            return { letters, number, suffix };
-        }
-        return { letters: '', number: 0, suffix: '' };
-    }
-
-    // Custom sort function: first by number descending, then by letters ascending
-    function sortWardsDesc(a, b) {
-        const wa = parseWard(a);
-        const wb = parseWard(b);
-
-        // Sort by number descending
-        if (wa.number > wb.number) return -1;
-        if (wa.number < wb.number) return 1;
-
-        // Then sort by letters ascending
-        if (wa.letters < wb.letters) return -1;
-        if (wa.letters > wb.letters) return 1;
-
-        // Finally, sort by suffix ascending
-        if (wa.suffix < wb.suffix) return -1;
-        if (wa.suffix > wb.suffix) return 1;
-
-        return 0;
+    // Function to auto-select the current weekday
+    async function autoSelectWeekday() {
+        const currentDate = new Date();
+        const weekdayNumber = currentDate.getDay(); // Sunday - Saturday : 0 - 6
+        const weekdayMap = {
+            1: "Monday",
+            2: "Tuesday",
+            3: "Wednesday",
+            4: "Thursday",
+            5: "Friday",
+            6: "Saturday",
+            0: "Sunday"
+        };
+        const currentWeekday = weekdayMap[weekdayNumber] || "Monday";
+        document.getElementById('weekdaySelect').value = currentWeekday;
     }
 </script>
 </body>
