@@ -14,52 +14,6 @@
 
 
     <style>
-
-.animate-spin {
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-.required {
-    color: red;
-    margin-left: 4px;
-}
-
-select:disabled,
-input:disabled {
-    background-color: #f5f5f5;
-    cursor: not-allowed;
-}
-
-button:disabled {
-    background-color: #cccccc !important;
-    cursor: not-allowed;
-    opacity: 0.7;
-}
-
-.search-group label {
-    font-weight: bold;
-}
-
-
-input:disabled {
-    background-color: #f5f5f5;
-    cursor: not-allowed;
-}
-
-button:disabled {
-    background-color: #cccccc !important;
-    cursor: not-allowed;
-    opacity: 0.7;
-}
 .scanner-overlay {
     position: absolute;
     top: 50%;
@@ -415,26 +369,19 @@ button:disabled {
         <div id="loading">Loading...</div>
         <div id="error" class="error"></div>
 
-<div class="search-group">
-    <label for="wardSelect">Ward: <span class="required">*</span></label>
-    <select id="wardSelect">
-        <option value="">Please select a ward</option>
-    </select>
-</div>
+        <div class="search-group">
+            <label for="wardSelect">Ward:</label>
+            <select id="wardSelect" onchange="displayItemCodes()">
+                <option value="">Please select a ward</option>
+            </select>
+        </div>
 
 <!-- Item Code Filter -->
 <div class="search-group">
     <label for="itemCodeFilter">Filter by Item Code:</label>
     <div class="search-input-group">
-        <input type="text" 
-               id="itemCodeFilter" 
-               placeholder="Please select a ward first" 
-               disabled 
-               oninput="filterItemCodes()">
-        <button id="scanButton" 
-                class="scan-button" 
-                onclick="startScanner()" 
-                disabled>
+        <input type="text" id="itemCodeFilter" placeholder="Enter Item Code" oninput="filterItemCodes()">
+        <button id="scanButton" class="scan-button" onclick="startScanner()">
             Scan Barcode
         </button>
     </div>
@@ -827,42 +774,16 @@ async function loadProductIds() {
         }
     }
 
-// 找到 updateWardSelect 函數，修改如下：
-function updateWardSelect() {
-    const select = document.getElementById('wardSelect');
-    select.innerHTML = '<option value="">Please select a ward</option>';
-    
-    Array.from(wards).sort(sortWardsDesc).forEach(ward => {
-        const option = document.createElement('option');
-        option.value = ward;
-        option.textContent = ward;
-        select.appendChild(option);
-    });
-
-    // 添加 onchange 事件監聽器
-    select.onchange = handleWardSelection;
-
-// 添加新的函數來處理 ward 選擇
-function handleWardSelection() {
-    const selectedWard = document.getElementById('wardSelect').value;
-    const itemCodeFilter = document.getElementById('itemCodeFilter');
-    const scanButton = document.getElementById('scanButton');
-    
-    if (selectedWard) {
-        // 啟用 item code filter 和 scan button
-        itemCodeFilter.disabled = false;
-        scanButton.disabled = false;
-        itemCodeFilter.placeholder = "Enter Item Code";
-        displayItemCodes(); // 顯示該病房的 item codes
-    } else {
-        // 禁用 item code filter 和 scan button
-        itemCodeFilter.disabled = true;
-        scanButton.disabled = true;
-        itemCodeFilter.placeholder = "Please select a ward first";
-        itemCodeFilter.value = ''; // 清空輸入
-        document.getElementById('result').innerHTML = ''; // 清空結果
-    }
-}
+    function updateWardSelect() {
+        const select = document.getElementById('wardSelect');
+        select.innerHTML = '<option value="">Please select a ward</option>';
+        
+        Array.from(wards).sort(sortWardsDesc).forEach(ward => {
+            const option = document.createElement('option');
+            option.value = ward;
+            option.textContent = ward;
+            select.appendChild(option);
+        });
     }
 
     // Helper function to parse ward into letters, number, and suffix
@@ -1223,20 +1144,32 @@ function handleWardSelection() {
 let codeReader;
 
 function startScanner() {
-    const selectedWard = document.getElementById('wardSelect').value;
-    if (!selectedWard) {
-        alert('Please select a ward first');
-        return;
-    }
-
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
     modal.style.display = 'block';
     
+    // 初始化 ZXing 掃描器
+    codeReader = new ZXing.MultiFormatReader();
+    const hints = new Map();
+    // 設置要識別的條碼類型
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+        ZXing.BarcodeFormat.QR_CODE,          // QR Code
+        ZXing.BarcodeFormat.DATA_MATRIX,      // Data Matrix
+        ZXing.BarcodeFormat.EAN_13,           // EAN-13
+        ZXing.BarcodeFormat.EAN_8,            // EAN-8
+        ZXing.BarcodeFormat.CODE_128,         // Code 128
+        ZXing.BarcodeFormat.CODE_39,          // Code 39
+        ZXing.BarcodeFormat.ITF,              // ITF
+        ZXing.BarcodeFormat.UPC_A,            // UPC-A
+        ZXing.BarcodeFormat.UPC_E            // UPC-E
+    ]);
+    
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ 
             video: { 
-                facingMode: "environment"
+                facingMode: "environment",
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
             } 
         })
         .then(function(stream) {
@@ -1267,50 +1200,29 @@ function scanBarcodes() {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
             try {
-                // 1. 快速掃描 QR Code
                 const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
-                if (qrResult) {
-                    console.log('QR Code found:', qrResult.data);
-                    // 直接處理 QR Code
-                    const drugMatch = qrResult.data.match(/<F>(.*?)<\/F>/);
-                    if (drugMatch) {
-                        handleItemCode(drugMatch[1]);
-                        return;
-                    }
-                }
-
-                // 2. 快速掃描一維碼和 DataMatrix
+                // 嘗試使用 ZXing 解碼
                 const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
                 const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
-                const reader = new ZXing.MultiFormatReader();
                 
-                const hints = new Map();
-                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-                    ZXing.BarcodeFormat.DATA_MATRIX,
-                    ZXing.BarcodeFormat.EAN_13,
-                    ZXing.BarcodeFormat.CODE_128
-                ]);
-                
-                const result = reader.decode(binaryBitmap, hints);
-                if (result) {
-                    const scannedText = result.text;
-                    console.log('Barcode found:', scannedText);
-                    
-                    // 檢查是否是純數字（一維碼）
-                    if (/^\d+$/.test(scannedText)) {
-                        handleItemCode(scannedText);
+                try {
+                    const result = codeReader.decode(binaryBitmap);
+                    if (result) {
+                        console.log('Barcode detected:', result.text);
+                        handleScannedCode(result.text);
                         return;
                     }
-                    
-                    // 如果不是純數字，可能是 DataMatrix
-                    // 顯示 loading 並進行詳細分析
-                    showLoading();
-                    handleDataMatrix(scannedText);
-                    return;
+                } catch (zxingError) {
+                    // ZXing 無法解碼，嘗試使用 jsQR
+                    const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+                    if (qrResult) {
+                        console.log('QR code detected:', qrResult.data);
+                        handleScannedCode(qrResult.data);
+                        return;
+                    }
                 }
             } catch (error) {
-                // 繼續掃描
+                console.error('Scanning error:', error);
             }
         }
         requestAnimationFrame(tick);
@@ -1319,7 +1231,68 @@ function scanBarcodes() {
     tick();
 }
 
+function handleScannedCode(scannedData) {
+    if (!scannedData) return;
+    
+    const selectedWard = document.getElementById('wardSelect').value;
+    if (!selectedWard) {
+        alert('Please select a ward first');
+        closeScanner();
+        return;
+    }
+    
+    console.log('Processing scanned data:', scannedData);
+    
+    // 嘗試解析藥品格式
+    const drugMatch = scannedData.match(/<F>(.*?)<\/F>/);
+    if (drugMatch) {
+        const itemCode = drugMatch[1];
+        console.log('Drug code detected:', itemCode);
+        
+        // 檢查該 item code 是否屬於所選病房
+        const itemExists = data.some(row => 
+            row.ward === selectedWard && 
+            row.itemCode.toString() === itemCode
+        );
 
+        if (!itemExists) {
+            alert(`This item is not a ward stock item of ${selectedWard}`);
+        }
+
+        document.getElementById('itemCodeFilter').value = itemCode;
+        filterItemCodes();
+        closeScanner();
+        return;
+    }
+
+    // 處理其他格式的條碼
+    const cleanedCode = scannedData.trim();
+    console.log('Looking up product ID:', cleanedCode);
+    const itemCode = productIdMap.get(cleanedCode);
+    
+    if (itemCode) {
+        console.log('Item code found:', itemCode);
+        
+        // 檢查該 item code 是否屬於所選病房
+        const itemExists = data.some(row => 
+            row.ward === selectedWard && 
+            row.itemCode.toString() === itemCode
+        );
+
+        if (!itemExists) {
+            alert(`This item is not a ward stock item of ${selectedWard}`);
+        }
+
+        document.getElementById('itemCodeFilter').value = itemCode;
+        filterItemCodes();
+        closeScanner();
+    } else {
+        console.log('No item code found for:', cleanedCode);
+        alert(`條碼 ${cleanedCode} 未登記，請手動輸入item code`);
+        document.getElementById('itemCodeFilter').value = '';
+        closeScanner();
+    }
+}
 
 function closeScanner() {
     const modal = document.getElementById('scannerModal');
@@ -1335,70 +1308,6 @@ function closeScanner() {
     if (codeReader) {
         codeReader.reset();
     }
-}
-
-
-// 顯示 Loading
-function showLoading() {
-    const modal = document.createElement('div');
-    modal.id = 'loadingModal';
-    modal.innerHTML = `
-        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-white p-4 rounded-lg shadow-lg text-center">
-                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-                <p class="mt-2">分析條碼中...</p>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-}
-
-// 隱藏 Loading
-function hideLoading() {
-    const modal = document.getElementById('loadingModal');
-    if (modal) {
-        modal.remove();
-    }
-}
-
-// 處理 DataMatrix
-async function handleDataMatrix(scannedText) {
-    try {
-        // 在這裡進行 DataMatrix 的詳細分析
-        const gtinMatch = scannedText.match(/GTIN[:\s]*(\d+)/i);
-        if (gtinMatch) {
-            const gtin = gtinMatch[1];
-            const itemCode = productIdMap.get(gtin);
-            
-            if (itemCode) {
-                handleItemCode(itemCode);
-            } else {
-                alert(`無法找到此 GTIN (${gtin}) 對應的 item code`);
-            }
-        } else {
-            alert('無法識別的 DataMatrix 格式');
-        }
-    } catch (error) {
-        console.error('DataMatrix 分析錯誤:', error);
-        alert('分析條碼時發生錯誤');
-    } finally {
-        hideLoading();
-        closeScanner();
-    }
-}
-
-function handleItemCode(itemCode) {
-    const selectedWard = document.getElementById('wardSelect').value;
-    if (!selectedWard) {
-        alert('Please select a ward first');
-        closeScanner();
-        return;
-    }
-
-    console.log('處理 item code:', itemCode);
-    document.getElementById('itemCodeFilter').value = itemCode;
-    filterItemCodes();
-    closeScanner();
 }
 
 </script>
