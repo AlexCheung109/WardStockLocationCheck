@@ -363,6 +363,7 @@
     <div id="binShelveTab" class="tab-content active container">
         <h1>Ward Stock Item Bin Shelve Checker</h1>
         <div id="binShelveUpdateInfo" class="update-info"></div>
+        <div id="productIdUpdateInfo" class="update-info"></div>
         <div id="itemPhqUpdateInfo" class="update-info"></div>
         
         <div id="loading">Loading...</div>
@@ -572,6 +573,7 @@ let productIdMap = new Map();
         const cupboardDate = await getFileLastUpdateDate('WardStockCupboard.xlsx');
         const itemPhqDate = await getFileLastUpdateDate('item_phq.xlsx');
         const dataCaptureDate = await getFileLastUpdateDate('Top_up_schedule_p1.png');
+        const productIdDate = await getFileLastUpdateDate('product_id.xlsx');
         
         document.getElementById('binShelveUpdateInfo').textContent = 
             `Bin shelve information last updated on: ${locationDate}`;
@@ -581,11 +583,14 @@ let productIdMap = new Map();
             `Item_phq.xlsx last updated on: ${itemPhqDate}`;
         document.getElementById('dataCaptureUpdateInfo').textContent = 
             `Data Capture last updated on: ${dataCaptureDate}`;
+        document.getElementById('productIdUpdateInfo').textContent = // 新增這行
+        `Product ID mapping last updated on: ${productIdDate}`; // 新增這行
 
         await Promise.all([
             loadDataFromGitHub(),
             loadCupboardDataFromGitHub(),
             loadItemDescriptions(),
+            loadProductIds(),
             autoSelectWeekday()
         ]);
     };
@@ -601,6 +606,41 @@ let productIdMap = new Map();
         document.getElementById(tabId + 'Tab').classList.add('active');
         button.classList.add('active');
     }
+async function loadProductIds() {
+    try {
+        const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Product_ID.xlsx';
+        const response = await fetch(excelUrl);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        const productData = XLSX.utils.sheet_to_json(worksheet, {
+            header: ['itemCode', 'productId'],
+            range: 1
+        });
+
+        // 清空當前的 Map
+        productIdMap.clear();
+        
+        // 將 productId 作為 key，itemCode 作為 value 存入 Map
+        productData.forEach(row => {
+            if (row.productId && row.itemCode) {
+                productIdMap.set(row.productId.toString().trim(), row.itemCode.toString().trim());
+            }
+        });
+        
+        console.log('Product ID mapping loaded:', productIdMap.size, 'entries');
+        
+    } catch (error) {
+        console.error('Error loading product IDs:', error);
+        document.getElementById('error').textContent = 'Error loading product IDs: ' + error.message;
+    }
+}
 
     async function loadDataFromGitHub() {
         const loading = document.getElementById('loading');
@@ -1194,13 +1234,32 @@ function scanBarcodes() {
 function handleScannedCode(scannedData) {
     if (!scannedData) return;
     
+    const selectedWard = document.getElementById('wardSelect').value;
+    if (!selectedWard) {
+        alert('Please select a ward first');
+        closeScanner();
+        return;
+    }
+    
     console.log('Processing scanned data:', scannedData);
     
     // 嘗試解析藥品格式
     const drugMatch = scannedData.match(/<F>(.*?)<\/F>/);
     if (drugMatch) {
-        console.log('Drug code detected:', drugMatch[1]);
-        document.getElementById('itemCodeFilter').value = drugMatch[1];
+        const itemCode = drugMatch[1];
+        console.log('Drug code detected:', itemCode);
+        
+        // 檢查該 item code 是否屬於所選病房
+        const itemExists = data.some(row => 
+            row.ward === selectedWard && 
+            row.itemCode.toString() === itemCode
+        );
+
+        if (!itemExists) {
+            alert(`This item is not a ward stock item of ${selectedWard}`);
+        }
+
+        document.getElementById('itemCodeFilter').value = itemCode;
         filterItemCodes();
         closeScanner();
         return;
@@ -1213,6 +1272,17 @@ function handleScannedCode(scannedData) {
     
     if (itemCode) {
         console.log('Item code found:', itemCode);
+        
+        // 檢查該 item code 是否屬於所選病房
+        const itemExists = data.some(row => 
+            row.ward === selectedWard && 
+            row.itemCode.toString() === itemCode
+        );
+
+        if (!itemExists) {
+            alert(`This item is not a ward stock item of ${selectedWard}`);
+        }
+
         document.getElementById('itemCodeFilter').value = itemCode;
         filterItemCodes();
         closeScanner();
