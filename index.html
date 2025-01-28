@@ -1284,8 +1284,8 @@ async function scanBarcodes() {
                 if (qrResult) {
                     console.log('QR Code detected:', qrResult.data);
                     const qrContent = qrResult.data;
-                    if (qrContent.includes('<f>') && qrContent.includes('</f>')) {
-                        const fMatch = qrContent.match(/<f>(.*?)<\/f>/);
+                    if (qrContent.includes('<F>') && qrContent.includes('</F>')) {
+                        const fMatch = qrContent.match(/<F>(.*?)<\/F>/);
                         if (fMatch && fMatch[1]) {
                             handleItemCode(fMatch[1]);
                             return;
@@ -1316,15 +1316,14 @@ async function scanBarcodes() {
                         if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
                             console.log('Processing Data Matrix:', scannedText);
                             // 檢查是否含有01到10之間的數字
-                            const numbers = scannedText.match(/0[1-9]|10/g);
-                            if (numbers) {
-                                const firstMatch = numbers[0];
-                                console.log('Extracted number:', firstMatch);
-                                const itemCode = productIdMap.get(firstMatch);
+                             const match = scannedText.match(/01(\d+?)(?=10|$)/);
+                               if (match && match[1]) {
+                                const extractedNumber = match[1];
+                                const itemCode = productIdMap.get(extractedNumber);
                                 if (itemCode) {
-                                    console.log('Found item code:', itemCode);
                                     handleItemCode(itemCode);
                                     return;
+                        
                                 }
                             }
                             
