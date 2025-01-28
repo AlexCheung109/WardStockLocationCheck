@@ -1314,7 +1314,7 @@ async function scanBarcodes() {
                         const format = result.getBarcodeFormat();
                         console.log('Barcode detected:', format, scannedText);
 
-// Data Matrix 處理部分的修改：
+// Data Matrix 處理
 if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
     console.log('Processing Data Matrix:', scannedText);
     // 尋找 01 之後到 10 之前的數字
@@ -1328,19 +1328,13 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
             handleItemCode(itemCode);
             return;
         }
-    
+    }
     
     // 如果找不到，顯示錯誤訊息
     alert(`無法識別的條碼格式或未找到對應的商品代碼`);
     closeScanner();
     return;
 }
-                            
-                            // 如果找不到，顯示錯誤訊息
-                            alert(`無法識別的條碼格式或未找到對應的商品代碼`);
-                            closeScanner();
-                            return;
-                        }
                         // 一維碼處理
                         else if (format === ZXing.BarcodeFormat.EAN_13 || 
                                 format === ZXing.BarcodeFormat.CODE_128) {
