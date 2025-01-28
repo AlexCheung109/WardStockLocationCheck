@@ -1284,13 +1284,15 @@ async function scanBarcodes() {
                 if (qrResult) {
                     console.log('QR Code detected:', qrResult.data);
                     const qrContent = qrResult.data;
-                    if (qrContent.includes('<f>') && qrContent.includes('</f>')) {
-                        const fMatch = qrContent.match(/<f>(.*?)<\/f>/);
-                        if (fMatch && fMatch[1]) {
-                            handleItemCode(fMatch[1]);
-                            return;
-                        }
+                    const fMatch = qrContent.match(/<f>(.*?)<\/f>/);
+                    if (fMatch && fMatch[1]) {
+                        const value = fMatch[1];
+                        document.getElementById('itemCodeFilter').value = value;
+                        filterItemCodes();
+                        closeScanner();
+                        return;
                     }
+                    return;
                 }
 
                 // 2. Data Matrix 和一維碼處理
@@ -1312,21 +1314,27 @@ async function scanBarcodes() {
                         const format = result.getBarcodeFormat();
                         console.log('Barcode detected:', format, scannedText);
 
-                        // Data Matrix 處理
-                        if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-                            console.log('Processing Data Matrix:', scannedText);
-                            // 檢查是否含有01到10之間的數字
-                            const numbers = scannedText.match(/0[1-9]|10/g);
-                            if (numbers) {
-                                const firstMatch = numbers[0];
-                                console.log('Extracted number:', firstMatch);
-                                const itemCode = productIdMap.get(firstMatch);
-                                if (itemCode) {
-                                    console.log('Found item code:', itemCode);
-                                    handleItemCode(itemCode);
-                                    return;
-                                }
-                            }
+// Data Matrix 處理部分的修改：
+if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
+    console.log('Processing Data Matrix:', scannedText);
+    // 尋找 01 之後到 10 之前的數字
+    const match = scannedText.match(/01(\d+?)(?=10|$)/);
+    if (match && match[1]) {
+        const extractedNumber = match[1];
+        console.log('Extracted number:', extractedNumber);
+        const itemCode = productIdMap.get(extractedNumber);
+        if (itemCode) {
+            console.log('Found item code:', itemCode);
+            handleItemCode(itemCode);
+            return;
+        }
+    }
+    
+    // 如果找不到，顯示錯誤訊息
+    alert(`無法識別的條碼格式或未找到對應的商品代碼`);
+    closeScanner();
+    return;
+}
                             
                             // 如果找不到，顯示錯誤訊息
                             alert(`無法識別的條碼格式或未找到對應的商品代碼`);
