@@ -1236,7 +1236,7 @@ let scanning = false;
 function startScanner() {
     const selectedWard = document.getElementById('wardSelect').value;
     if (!selectedWard) {
-        alert('Please select a ward first');
+        alert('請先選擇病房');
         return;
     }
 
@@ -1244,23 +1244,69 @@ function startScanner() {
     const video = document.getElementById('scanner-video');
     modal.style.display = 'block';
     
+    // 詳細的相機配置
+    const constraints = {
+        video: {
+            facingMode: "environment",
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            focusMode: { ideal: "continuous" },
+            // 啟用自動對焦
+            advanced: [{
+                focusMode: ["continuous", "continuous-picture", "auto"],
+                autoFocus: true,
+                zoom: 0
+            }]
+        }
+    };
+
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ 
-            video: { 
-                facingMode: "environment"
-            } 
-        })
-        .then(function(stream) {
-            video.srcObject = stream;
-            video.setAttribute('playsinline', true);
-            video.play();
-            scanning = true;
-            scanBarcodes();
-        })
-        .catch(function(error) {
-            console.error("Camera error: ", error);
-            alert("Error accessing camera. Please make sure you have granted camera permissions.");
-        });
+        navigator.mediaDevices.getUserMedia(constraints)
+            .then(function(stream) {
+                video.srcObject = stream;
+                video.setAttribute('playsinline', true);
+                
+                // 獲取視訊軌道
+                const videoTrack = stream.getVideoTracks()[0];
+                
+                // 應用進階相機設定
+                const capabilities = videoTrack.getCapabilities();
+                const settings = {
+                    focusMode: capabilities.focusMode?.includes('continuous') ? 'continuous' : 'auto',
+                    whiteBalance: capabilities.whiteBalanceMode?.includes('continuous') ? 'continuous' : 'auto',
+                    exposureMode: capabilities.exposureMode?.includes('continuous') ? 'continuous' : 'auto'
+                };
+
+                // 定期觸發自動對焦
+                setInterval(() => {
+                    try {
+                        if (scanning) {
+                            videoTrack.applyConstraints({
+                                advanced: [{
+                                    focusMode: "continuous",
+                                    autoFocus: true
+                                }]
+                            }).catch(e => console.log('自動對焦設定錯誤:', e));
+                        }
+                    } catch (error) {
+                        console.log('對焦操作錯誤:', error);
+                    }
+                }, 1000); // 每秒觸發一次自動對焦
+
+                try {
+                    videoTrack.applyConstraints({ advanced: [settings] });
+                } catch (error) {
+                    console.log('相機設定錯誤:', error);
+                }
+
+                video.play();
+                scanning = true;
+                scanBarcodes();
+            })
+            .catch(function(error) {
+                console.error("相機錯誤: ", error);
+                alert("無法訪問相機，請確認已授予相機權限。");
+            });
     }
 }
 
