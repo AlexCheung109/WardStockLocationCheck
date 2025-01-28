@@ -1253,7 +1253,7 @@ function startScanner() {
     }
 }
 
-function scanBarcodes() {
+async function scanBarcodes() {
     const video = document.getElementById('scanner-video');
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
@@ -1267,20 +1267,21 @@ function scanBarcodes() {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
             try {
-                // 1. 快速掃描 QR Code
+                // 1. QR Code 处理
                 const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
                 const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
                 if (qrResult) {
-                    console.log('QR Code found:', qrResult.data);
-                    // 直接處理 QR Code
-                    const drugMatch = qrResult.data.match(/<F>(.*?)<\/F>/);
-                    if (drugMatch) {
-                        handleItemCode(drugMatch[1]);
-                        return;
+                    const qrContent = qrResult.data;
+                    if (qrContent.startsWith('<a>')) {
+                        const fMatch = qrContent.match(/<f>(.*?)<\/f>/i);
+                        if (fMatch) {
+                            handleItemCode(fMatch[1]);
+                            return;
+                        }
                     }
                 }
 
-                // 2. 快速掃描一維碼和 DataMatrix
+                // 2. Data Matrix 和一维码处理
                 const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
                 const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
                 const reader = new ZXing.MultiFormatReader();
@@ -1295,22 +1296,36 @@ function scanBarcodes() {
                 const result = reader.decode(binaryBitmap, hints);
                 if (result) {
                     const scannedText = result.text;
-                    console.log('Barcode found:', scannedText);
-                    
-                    // 檢查是否是純數字（一維碼）
-                    if (/^\d+$/.test(scannedText)) {
-                        handleItemCode(scannedText);
-                        return;
+                    const format = result.getBarcodeFormat();
+
+                    // Data Matrix 处理
+                    if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
+                        // 检查是否以 01 开头
+                        if (scannedText.startsWith('01')) {
+                            // 提取 01 到 17 之间的数字
+                            const match = scannedText.match(/01(\d+?)(?=17|$)/);
+                            if (match && match[1]) {
+                                const gtinPart = match[1];
+                                const itemCode = productIdMap.get(gtinPart);
+                                if (itemCode) {
+                                    handleItemCode(itemCode);
+                                    return;
+                                }
+                            }
+                        }
+                    } 
+                    // 一维码处理
+                    else if (format === ZXing.BarcodeFormat.EAN_13 || 
+                            format === ZXing.BarcodeFormat.CODE_128) {
+                        const itemCode = productIdMap.get(scannedText);
+                        if (itemCode) {
+                            handleItemCode(itemCode);
+                            return;
+                        }
                     }
-                    
-                    // 如果不是純數字，可能是 DataMatrix
-                    // 顯示 loading 並進行詳細分析
-                    showLoading();
-                    handleDataMatrix(scannedText);
-                    return;
                 }
             } catch (error) {
-                // 繼續掃描
+                console.error('Scanning error:', error);
             }
         }
         requestAnimationFrame(tick);
@@ -1395,11 +1410,12 @@ function handleItemCode(itemCode) {
         return;
     }
 
-    console.log('處理 item code:', itemCode);
     document.getElementById('itemCodeFilter').value = itemCode;
     filterItemCodes();
     closeScanner();
 }
+
+
 
 </script>
 </body>
