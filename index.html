@@ -1244,91 +1244,44 @@ function scanBarcodes() {
     const video = document.getElementById('scanner-video');
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
-    
-    // 降低處理的圖像大小以提高性能
-    const SCAN_WIDTH = 640;  // 適中的掃描寬度
-    const SCAN_HEIGHT = 480; // 適中的掃描高度
-    
-    canvas.width = SCAN_WIDTH;
-    canvas.height = SCAN_HEIGHT;
-    
-    // 用於控制掃描頻率
-    let lastScanTime = 0;
-    const SCAN_INTERVAL = 100; // 每100ms掃描一次
 
     async function tick() {
         if (!scanning) return;
-        
-        // 控制掃描頻率
-        const now = Date.now();
-        if (now - lastScanTime < SCAN_INTERVAL) {
-            requestAnimationFrame(tick);
-            return;
-        }
-        lastScanTime = now;
 
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            // 只掃描中間區域
-            const sourceX = (video.videoWidth - SCAN_WIDTH) / 2;
-            const sourceY = (video.videoHeight - SCAN_HEIGHT) / 2;
-            
-            // 降低解析度提高速度
-            context.drawImage(
-                video,
-                sourceX, sourceY, SCAN_WIDTH, SCAN_HEIGHT,  // 源圖像區域
-                0, 0, canvas.width, canvas.height           // 目標區域
-            );
+            canvas.height = video.videoHeight;
+            canvas.width = video.videoWidth;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
             try {
+                // 1. 快速掃描 QR Code
                 const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+                if (qrResult) {
+                    console.log('QR Code found:', qrResult.data);
+                    if (handleScannedCode(qrResult.data)) return;
+                }
+
+                // 2. 快速掃描 DataMatrix 和一維碼
+                const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+                const reader = new ZXing.MultiFormatReader();
                 
-                // 使用 Promise.race 來實現超時控制
-                const scanPromise = new Promise(async (resolve) => {
-                    // 優先檢查 DataMatrix，因為這是你主要需要的
-                    try {
-                        const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-                        const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
-                        const reader = new ZXing.MultiFormatReader();
-                        
-                        const hints = new Map();
-                        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-                            ZXing.BarcodeFormat.DATA_MATRIX,  // 優先 DataMatrix
-                            ZXing.BarcodeFormat.QR_CODE,      // 其次 QR
-                            ZXing.BarcodeFormat.EAN_13        // 最後一維碼
-                        ]);
-                        hints.set(ZXing.DecodeHintType.TRY_HARDER, false); // 關閉深度搜索
-                        
-                        const result = reader.decode(binaryBitmap, hints);
-                        if (result) {
-                            resolve({ type: 'zxing', data: result.text });
-                            return;
-                        }
-                    } catch (zxingError) {
-                        // 如果 ZXing 失敗，立即嘗試 jsQR
-                        const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
-                        if (qrResult) {
-                            resolve({ type: 'qr', data: qrResult.data });
-                            return;
-                        }
-                    }
-                    resolve(null);
-                });
+                const hints = new Map();
+                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                    ZXing.BarcodeFormat.DATA_MATRIX,
+                    ZXing.BarcodeFormat.EAN_13,
+                    ZXing.BarcodeFormat.CODE_128
+                ]);
                 
-                // 設置超時
-                const timeoutPromise = new Promise((resolve) => {
-                    setTimeout(() => resolve(null), 100); // 100ms 超時
-                });
-                
-                const result = await Promise.race([scanPromise, timeoutPromise]);
-                
+                const result = reader.decode(binaryBitmap, hints);
                 if (result) {
-                    console.log(`Detected (${result.type}):`, result.data);
-                    if (handleScannedCode(result.data)) {
-                        return;
-                    }
+                    console.log('Barcode found:', result.text);
+                    handleScannedCode(result.text);
+                    return;
                 }
             } catch (error) {
-                console.error('Scanning error:', error);
+                // 繼續掃描
             }
         }
         requestAnimationFrame(tick);
@@ -1336,7 +1289,6 @@ function scanBarcodes() {
 
     tick();
 }
-
 
 function handleScannedCode(scannedData) {
     if (!scannedData) return false;
@@ -1347,23 +1299,16 @@ function handleScannedCode(scannedData) {
         closeScanner();
         return false;
     }
-    
-    // 使用 Map 來存儲正則表達式，避免重複創建
-    const patterns = new Map([
-        ['drug', /<F>(.*?)<\/F>/],
-        ['gtin', /GTIN[:\s]*(\d+)/i],
-        ['numeric', /^\d+$/]
-    ]);
-    
-    // 檢查 <F></F> 格式
-    const drugMatch = scannedData.match(patterns.get('drug'));
+
+    // 1. 檢查 <F></F> 格式
+    const drugMatch = scannedData.match(/<F>(.*?)<\/F>/);
     if (drugMatch) {
         handleItemCode(drugMatch[1], selectedWard);
         return true;
     }
     
-    // 檢查 GTIN
-    const gtinMatch = scannedData.match(patterns.get('gtin'));
+    // 2. 檢查是否是 GTIN
+    const gtinMatch = scannedData.match(/GTIN[:\s]*(\d+)/i);
     if (gtinMatch) {
         const itemCode = productIdMap.get(gtinMatch[1]);
         if (itemCode) {
@@ -1372,34 +1317,25 @@ function handleScannedCode(scannedData) {
         }
     }
     
-    // 檢查純數字
-    if (patterns.get('numeric').test(scannedData)) {
+    // 3. 檢查純數字（一維碼）
+    if (/^\d+$/.test(scannedData)) {
         const itemCode = productIdMap.get(scannedData);
         if (itemCode) {
             handleItemCode(itemCode, selectedWard);
             return true;
         }
     }
-    
-    console.log('無法識別的條碼格式');
+
     return false;
 }
+
 function handleItemCode(itemCode, selectedWard) {
-    console.log('處理 item code:', itemCode, '病房:', selectedWard);
-    
-    const itemExists = data.some(row => 
-        row.ward === selectedWard && 
-        row.itemCode.toString() === itemCode.toString()
-    );
-
-    if (!itemExists) {
-        alert(`This item is not a ward stock item of ${selectedWard}`);
-    }
-
+    console.log('處理 item code:', itemCode);
     document.getElementById('itemCodeFilter').value = itemCode;
     filterItemCodes();
     closeScanner();
 }
+
 function closeScanner() {
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
