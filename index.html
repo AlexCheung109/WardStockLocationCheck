@@ -14,6 +14,27 @@
 
 
     <style>
+.scanning-tips {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    text-align: center;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+#scanner-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 4px;
+    transform: scaleX(-1); /* 如果需要鏡像翻轉 */
+}
 
 .required {
     color: red;
@@ -59,25 +80,9 @@ button:disabled {
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
 }
 
-.scanning-line {
-    position: absolute;
-    width: 100%;
-    height: 2px;
-    background-color: #4CAF50;
-    animation: scan 2s linear infinite;
-}
 
-@keyframes scan {
-    0% {
-        transform: translateY(-100px);
-    }
-    50% {
-        transform: translateY(100px);
-    }
-    100% {
-        transform: translateY(-100px);
-    }
-}
+
+
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
@@ -429,15 +434,18 @@ button:disabled {
 
 <!-- Scanner Modal -->
 <div id="scannerModal" class="scanner-modal">
-    <div class="scanner-content">
-        <div class="scanner-header">
-            <span>Scan Barcode</span>
-            <button class="close-button" onclick="closeScanner()">&times;</button>
-        </div>
-        <div id="scanner-container">
-            <video id="scanner-video" playsinline></video>
-            <div class="scanner-overlay"></div>
-            <div class="scanning-line"></div>
+<div class="scanner-content">
+    <div class="scanner-header">
+        <span>Scan Barcode</span>
+        <button class="close-button" onclick="closeScanner()">&times;</button>
+    </div>
+    <div id="scanner-container">
+        <video id="scanner-video" playsinline></video>
+        <div class="scanner-overlay"></div>
+        <div class="scanning-tips">
+            請將條碼置於框內<br>
+            確保光線充足<br>
+            保持手機穩定
         </div>
     </div>
 </div>
@@ -1220,34 +1228,16 @@ function startScanner() {
     const video = document.getElementById('scanner-video');
     modal.style.display = 'block';
     
-    // 初始化 ZXing 掃描器
-    codeReader = new ZXing.MultiFormatReader();
-    const hints = new Map();
-    
-    // 設置要識別的條碼類型，確保包含所有 GTIN 相關格式
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-        ZXing.BarcodeFormat.EAN_8,        // GTIN-8
-        ZXing.BarcodeFormat.EAN_13,       // GTIN-13
-        ZXing.BarcodeFormat.UPC_A,        // GTIN-12
-        ZXing.BarcodeFormat.UPC_E,        // UPC-E (縮短版的 UPC)
-        ZXing.BarcodeFormat.CODE_128,     // GS1-128 (可用於 GTIN-14)
-        ZXing.BarcodeFormat.ITF,          // ITF-14 (用於 GTIN-14)
-        ZXing.BarcodeFormat.QR_CODE,
-        ZXing.BarcodeFormat.DATA_MATRIX
-    ]);
-
-    // 添加其他解碼提示
-    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);     // 更努力嘗試解碼
-    hints.set(ZXing.DecodeHintType.ASSUME_GS1, true);     // 假設是 GS1 格式（包括 GTIN）
-
-    codeReader.hints = hints;
-    
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ 
             video: { 
                 facingMode: "environment",
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+                // 添加更多相機設置
+                focusMode: 'continuous',
+                exposureMode: 'continuous',
+                whiteBalanceMode: 'continuous'
             } 
         })
         .then(function(stream) {
@@ -1255,6 +1245,20 @@ function startScanner() {
             video.setAttribute('playsinline', true);
             video.play();
             scanning = true;
+            
+            // 設置相機參數
+            const track = stream.getVideoTracks()[0];
+            const capabilities = track.getCapabilities();
+            
+            if (capabilities.focusDistance) {
+                track.applyConstraints({
+                    advanced: [{
+                        focusMode: 'continuous',
+                        focusDistance: 0.1 // 近距離對焦
+                    }]
+                });
+            }
+            
             scanBarcodes();
         })
         .catch(function(error) {
@@ -1279,36 +1283,45 @@ function scanBarcodes() {
             
             try {
                 const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                // 嘗試使用 ZXing 解碼
+                
+                // 使用 ZXing 專門處理 DataMatrix
                 const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
                 const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+                const reader = new ZXing.MultiFormatReader();
                 
-                try {
-                    const result = codeReader.decode(binaryBitmap);
-                    if (result) {
-                        console.log('Barcode detected:', result.text);
-                        handleScannedCode(result.text);
-                        return;
+                const hints = new Map();
+                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                    ZXing.BarcodeFormat.DATA_MATRIX,  // 優先處理 DataMatrix
+                    ZXing.BarcodeFormat.QR_CODE,
+                    ZXing.BarcodeFormat.EAN_13,
+                    ZXing.BarcodeFormat.EAN_8
+                ]);
+                hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+                hints.set(ZXing.DecodeHintType.ASSUME_GS1, true);
+                
+                const result = reader.decode(binaryBitmap, hints);
+                if (result) {
+                    console.log('完整掃描結果:', result);
+                    const text = result.text;
+                    // 提取 GTIN
+                    const gtinMatch = text.match(/GTIN\s*(\d+)/i);
+                    if (gtinMatch) {
+                        console.log('找到 GTIN:', gtinMatch[1]);
+                        handleScannedCode(gtinMatch[1]);
+                    } else {
+                        handleScannedCode(text);
                     }
-                } catch (zxingError) {
-                    // ZXing 無法解碼，嘗試使用 jsQR
-                    const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
-                    if (qrResult) {
-                        console.log('QR code detected:', qrResult.data);
-                        handleScannedCode(qrResult.data);
-                        return;
-                    }
+                    return;
                 }
             } catch (error) {
-                console.error('Scanning error:', error);
+                // 繼續掃描
             }
         }
         requestAnimationFrame(tick);
     }
 
     tick();
-}
-function handleScannedCode(scannedData) {
+}function handleScannedCode(scannedData) {
     if (!scannedData) return;
     
     const selectedWard = document.getElementById('wardSelect').value;
