@@ -14,27 +14,6 @@
 
 
     <style>
-.scanning-tips {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 5px;
-    text-align: center;
-    font-size: 14px;
-    line-height: 1.5;
-}
-
-#scanner-video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 4px;
-    transform: scaleX(-1); /* 如果需要鏡像翻轉 */
-}
 
 .required {
     color: red;
@@ -80,9 +59,25 @@ button:disabled {
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
 }
 
+.scanning-line {
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    background-color: #4CAF50;
+    animation: scan 2s linear infinite;
+}
 
-
-
+@keyframes scan {
+    0% {
+        transform: translateY(-100px);
+    }
+    50% {
+        transform: translateY(100px);
+    }
+    100% {
+        transform: translateY(-100px);
+    }
+}
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
@@ -434,18 +429,15 @@ button:disabled {
 
 <!-- Scanner Modal -->
 <div id="scannerModal" class="scanner-modal">
-<div class="scanner-content">
-    <div class="scanner-header">
-        <span>Scan Barcode</span>
-        <button class="close-button" onclick="closeScanner()">&times;</button>
-    </div>
-    <div id="scanner-container">
-        <video id="scanner-video" playsinline></video>
-        <div class="scanner-overlay"></div>
-        <div class="scanning-tips">
-            請將條碼置於框內<br>
-            確保光線充足<br>
-            保持手機穩定
+    <div class="scanner-content">
+        <div class="scanner-header">
+            <span>Scan Barcode</span>
+            <button class="close-button" onclick="closeScanner()">&times;</button>
+        </div>
+        <div id="scanner-container">
+            <video id="scanner-video" playsinline></video>
+            <div class="scanner-overlay"></div>
+            <div class="scanning-line"></div>
         </div>
     </div>
 </div>
@@ -1228,15 +1220,10 @@ function startScanner() {
     const video = document.getElementById('scanner-video');
     modal.style.display = 'block';
     
-    // 使用 jsQR 作為主要掃描器，因為它對一維條碼的支援較好
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ 
             video: { 
-                facingMode: "environment",
-                width: { ideal: 1920 }, // 提高解析度
-                height: { ideal: 1080 },
-                focusMode: 'continuous', // 自動對焦
-                zoom: 2.0 // 嘗試放大
+                facingMode: "environment"
             } 
         })
         .then(function(stream) {
@@ -1244,25 +1231,6 @@ function startScanner() {
             video.setAttribute('playsinline', true);
             video.play();
             scanning = true;
-            
-            // 調整視訊設置
-            const track = stream.getVideoTracks()[0];
-            const capabilities = track.getCapabilities();
-            
-            // 如果相機支持這些功能，就設置它們
-            const settings = {
-                focusMode: 'continuous',
-                whiteBalanceMode: 'continuous',
-                exposureMode: 'continuous'
-            };
-            
-            if (capabilities.torch) {
-                settings.torch = true; // 開啟閃光燈
-            }
-            
-            track.applyConstraints({ advanced: [settings] })
-                .catch(console.log); // 忽略不支持的設置
-                
             scanBarcodes();
         })
         .catch(function(error) {
@@ -1288,39 +1256,37 @@ function scanBarcodes() {
             try {
                 const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
                 
-                // 先嘗試用 jsQR 識別
+                // 1. 首先嘗試用 jsQR 掃描 QR Code（可能包含 <F></F>）
                 const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
                 if (qrResult) {
-                    console.log('QR code detected:', qrResult.data);
-                    handleScannedCode(qrResult.data);
-                    return;
+                    console.log('QR Code detected:', qrResult.data);
+                    if (handleScannedCode(qrResult.data)) return;
                 }
                 
-                // 如果 jsQR 失敗，使用 ZXing
+                // 2. 使用 ZXing 處理所有格式，包括 DataMatrix 和一維條碼
+                const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+                const reader = new ZXing.MultiFormatReader();
+                
+                const hints = new Map();
+                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                    ZXing.BarcodeFormat.DATA_MATRIX,  // DataMatrix
+                    ZXing.BarcodeFormat.EAN_13,       // 一維條碼
+                    ZXing.BarcodeFormat.EAN_8,
+                    ZXing.BarcodeFormat.CODE_128,
+                    ZXing.BarcodeFormat.QR_CODE       // 也支援 QR
+                ]);
+                hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+                
                 try {
-                    const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-                    const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
-                    const reader = new ZXing.MultiFormatReader();
-                    
-                    // 設置解碼提示
-                    const hints = new Map();
-                    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-                        ZXing.BarcodeFormat.EAN_8,
-                        ZXing.BarcodeFormat.EAN_13,
-                        ZXing.BarcodeFormat.UPC_A,
-                        ZXing.BarcodeFormat.UPC_E
-                    ]);
-                    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-                    hints.set(ZXing.DecodeHintType.PURE_BARCODE, true);
-                    
                     const result = reader.decode(binaryBitmap, hints);
                     if (result) {
-                        console.log('Barcode detected:', result.text);
+                        console.log('ZXing detected:', result.text);
                         handleScannedCode(result.text);
                         return;
                     }
                 } catch (zxingError) {
-                    // 忽略解碼錯誤，繼續嘗試
+                    // 繼續掃描
                 }
             } catch (error) {
                 console.error('Scanning error:', error);
@@ -1331,94 +1297,73 @@ function scanBarcodes() {
 
     tick();
 }
+
 function handleScannedCode(scannedData) {
-    if (!scannedData) return;
+    if (!scannedData) return false;
     
     const selectedWard = document.getElementById('wardSelect').value;
     if (!selectedWard) {
         alert('Please select a ward first');
         closeScanner();
-        return;
+        return false;
     }
     
     console.log('原始掃描數據:', scannedData);
     
-    // 清理掃描到的數據
-    let cleanedCode = scannedData.trim();
-    
-    // 檢查是否是藥品格式 (<F>...</F>)
-    const drugMatch = cleanedCode.match(/<F>(.*?)<\/F>/);
+    // 1. 檢查 <F></F> 格式
+    const drugMatch = scannedData.match(/<F>(.*?)<\/F>/);
     if (drugMatch) {
+        console.log('找到藥品格式:', drugMatch[1]);
         const itemCode = drugMatch[1];
         handleItemCode(itemCode, selectedWard);
-        return;
+        return true;
     }
-
-    // 處理 GTIN 格式
-    // 移除所有可能的 GS1 應用標識符 (AI)
-    cleanedCode = cleanedCode
-        .replace(/^\(01\)/, '')     // 移除 GTIN 的 AI (01)
-        .replace(/\([0-9]{2}\)/g, '') // 移除其他 AI
-        .replace(/[^0-9]/g, '');    // 只保留數字
     
-    console.log('清理後的條碼:', cleanedCode);
-    
-    // 確保 GTIN 格式正確（8、12、13 或 14位數字）
-    const gtinMatch = cleanedCode.match(/^(\d{8}|\d{12}|\d{13}|\d{14})$/);
+    // 2. 檢查 DataMatrix 中的 GTIN
+    const gtinMatch = scannedData.match(/GTIN[:\s]*(\d+)/i);
     if (gtinMatch) {
-        console.log('檢測到 GTIN:', cleanedCode);
-        // 直接使用完整的 GTIN 查找
-        let itemCode = productIdMap.get(cleanedCode);
-        
-        // 如果找不到，嘗試不同的 GTIN 長度
-        if (!itemCode && cleanedCode.length === 14) {
-            // 嘗試去掉 GTIN-14 的包裝層級指示符
-            const gtin13 = cleanedCode.substring(1);
-            itemCode = productIdMap.get(gtin13);
-            console.log('嘗試 GTIN-13:', gtin13);
-        }
-        
+        console.log('找到 GTIN:', gtinMatch[1]);
+        const gtin = gtinMatch[1];
+        const itemCode = productIdMap.get(gtin);
         if (itemCode) {
-            console.log('找到對應的 item code:', itemCode);
             handleItemCode(itemCode, selectedWard);
-        } else {
-            console.log('找不到對應的 item code');
-            alert(`無法找到此 GTIN (${cleanedCode}) 對應的 item code，請手動輸入`);
-            document.getElementById('itemCodeFilter').value = '';
-            closeScanner();
+            return true;
         }
-    } else {
-        // 如果不是標準 GTIN 格式，嘗試作為一般條碼處理
-        console.log('非標準 GTIN 格式，嘗試一般條碼處理:', cleanedCode);
-        const itemCode = productIdMap.get(cleanedCode);
-        handleItemCode(itemCode, selectedWard);
     }
+    
+    // 3. 處理一維條碼（純數字）
+    if (/^\d+$/.test(scannedData)) {
+        console.log('找到一維條碼:', scannedData);
+        const itemCode = productIdMap.get(scannedData);
+        if (itemCode) {
+            handleItemCode(itemCode, selectedWard);
+            return true;
+        }
+    }
+    
+    // 如果都沒有匹配
+    console.log('無法識別的條碼格式');
+    alert('無法識別的條碼格式或找不到對應的 item code');
+    document.getElementById('itemCodeFilter').value = '';
+    closeScanner();
+    return false;
 }
 
-// 新增處理 item code 的輔助函數
 function handleItemCode(itemCode, selectedWard) {
-    if (itemCode) {
-        console.log('Item code found:', itemCode);
-        
-        // 檢查該 item code 是否屬於所選病房
-        const itemExists = data.some(row => 
-            row.ward === selectedWard && 
-            row.itemCode.toString() === itemCode.toString()
-        );
+    console.log('處理 item code:', itemCode, '病房:', selectedWard);
+    
+    const itemExists = data.some(row => 
+        row.ward === selectedWard && 
+        row.itemCode.toString() === itemCode.toString()
+    );
 
-        if (!itemExists) {
-            alert(`This item is not a ward stock item of ${selectedWard}`);
-        }
-
-        document.getElementById('itemCodeFilter').value = itemCode;
-        filterItemCodes();
-        closeScanner();
-    } else {
-        console.log('No item code found for scanned barcode');
-        alert(`Barcode not registered, please enter item code manually`);
-        document.getElementById('itemCodeFilter').value = '';
-        closeScanner();
+    if (!itemExists) {
+        alert(`This item is not a ward stock item of ${selectedWard}`);
     }
+
+    document.getElementById('itemCodeFilter').value = itemCode;
+    filterItemCodes();
+    closeScanner();
 }
 function closeScanner() {
     const modal = document.getElementById('scannerModal');
