@@ -13,6 +13,10 @@
 <script src="https://unpkg.com/@zxing/library@latest"></script>
 
 
+<!-- 在 head 部分添加 -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+
     <style>
 
 .animate-spin {
@@ -1270,78 +1274,89 @@ async function scanBarcodes() {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
 
-    const reader = new ZXing.MultiFormatReader();
-    const hints = new Map();
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-        ZXing.BarcodeFormat.DATA_MATRIX,
-        ZXing.BarcodeFormat.EAN_13,
-        ZXing.BarcodeFormat.CODE_128,
-        ZXing.BarcodeFormat.QR_CODE // 如果需要也加入 QR Code
-    ]);
-    reader.setHints(hints);
-
     async function tick() {
         if (!scanning) return;
 
-        frameCount++;
-        if (frameCount % 3 !== 0) { // 每3幀掃描一次
-            requestAnimationFrame(tick);
-            return;
-        }
-
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvas.width = video.videoWidth / 2; // 降低解析度
-            canvas.height = video.videoHeight / 2;
+            canvas.height = video.videoHeight;
+            canvas.width = video.videoWidth;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-
             try {
-                const result = reader.decodeBitmap(imageData);
-                if (result) {
-                    const scannedText = result.getText();
-                    const format = result.getBarcodeFormat();
-                    console.log('掃描到的條碼:', format, scannedText);
+                // 1. QR Code 處理
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+                
+                if (qrResult) {
+                    console.log('QR Code detected:', qrResult.data);
+                    // 修改為大寫 F 標籤的匹配
+                    const match = qrResult.data.match(/<F>(.*?)<\/F>/);
+                    if (match && match[1]) {
+                        const value = match[1];
+                        console.log('Found value in F tags:', value);
+                        document.getElementById('itemCodeFilter').value = value;
+                        filterItemCodes();
+                        closeScanner();
+                        return;
+                    }
+                }
 
-                    if (format === ZXing.BarcodeFormat.QR_CODE) {
-                        const fMatch = scannedText.match(/<f>(.*?)<\/f>/i);
-                        if (fMatch && fMatch[1]) {
-                            const value = fMatch[1];
-                            document.getElementById('itemCodeFilter').value = value;
-                            filterItemCodes();
-                            closeScanner();
-                            return;
+                // 2. Data Matrix 和一維碼處理
+                const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+                const reader = new ZXing.MultiFormatReader();
+                
+                const hints = new Map();
+                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                    ZXing.BarcodeFormat.DATA_MATRIX,
+                    ZXing.BarcodeFormat.EAN_13,
+                    ZXing.BarcodeFormat.CODE_128
+                ]);
+                
+                try {
+                    const result = reader.decode(binaryBitmap, hints);
+                    if (result) {
+                        const scannedText = result.text;
+                        const format = result.getBarcodeFormat();
+                        console.log('條碼類型:', format, '內容:', scannedText);
+
+                        if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
+                            // 尋找 01 之後到 10 之前的數字
+                            const match = scannedText.match(/01(\d+?)(?=10|$)/);
+                            if (match && match[1]) {
+                                const extractedNumber = match[1];
+                                const itemCode = productIdMap.get(extractedNumber);
+                                if (itemCode) {
+                                    handleItemCode(itemCode);
+                                    return;
+                                }
+                            }
+                        } else if (format === ZXing.BarcodeFormat.EAN_13 || 
+                                 format === ZXing.BarcodeFormat.CODE_128) {
+                            const normalizedText = normalizeBarcode(scannedText);
+                            const itemCode = productIdMap.get(normalizedText);
+                            if (itemCode) {
+                                handleItemCode(itemCode);
+                                return;
+                            }
                         }
-                    } else if (format === ZXing.BarcodeFormat.DATA_MATRIX ||
-                               format === ZXing.BarcodeFormat.EAN_13 ||
-                               format === ZXing.BarcodeFormat.CODE_128) {
-                        const normalizedText = normalizeBarcode(scannedText);
-                        const itemCode = productIdMap.get(normalizedText);
-                        if (itemCode) {
-                            handleItemCode(itemCode);
-                            return;
-                        } else {
-                            alert(`條碼 ${normalizedText} 未在系統中登記`);
-                            closeScanner();
-                            return;
-                        }
+                    }
+                } catch (error) {
+                    if (error.name !== 'NotFoundException') {
+                        console.error('條碼讀取錯誤:', error);
                     }
                 }
             } catch (error) {
-                // ZXing 可能會拋出 NotFoundException，忽略它
-                if (!(error instanceof ZXing.NotFoundException)) {
-                    console.error('ZXing 解碼錯誤:', error);
-                }
+                console.error('掃描錯誤:', error);
             }
+            requestAnimationFrame(tick);
+        } else {
+            requestAnimationFrame(tick);
         }
-
-        frameCount = 0;
-        requestAnimationFrame(tick);
     }
 
     tick();
 }
-
 function closeScanner() {
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
