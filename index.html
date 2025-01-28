@@ -621,7 +621,17 @@ let productIdMap = new Map();
         return description.substring(0, 50) + '...';
     }
 
-    window.onload = async function() {
+window.onload = async function() {
+    try {
+        // 檢查必要的庫是否已載入
+        if (!window.ZXing) {
+            console.error('ZXing library not loaded');
+        }
+        if (!window.jsQR) {
+            console.error('jsQR library not loaded');
+        }
+
+        // 原有的更新日期檢查
         const locationDate = await getFileLastUpdateDate('Location.xlsx');
         const cupboardDate = await getFileLastUpdateDate('WardStockCupboard.xlsx');
         const itemPhqDate = await getFileLastUpdateDate('item_phq.xlsx');
@@ -636,9 +646,10 @@ let productIdMap = new Map();
             `Item_phq.xlsx last updated on: ${itemPhqDate}`;
         document.getElementById('dataCaptureUpdateInfo').textContent = 
             `Data Capture last updated on: ${dataCaptureDate}`;
-        document.getElementById('productIdUpdateInfo').textContent = // 新增這行
-        `Product ID mapping last updated on: ${productIdDate}`; // 新增這行
+        document.getElementById('productIdUpdateInfo').textContent = 
+            `Product ID mapping last updated on: ${productIdDate}`;
 
+        // 載入所有必要數據
         await Promise.all([
             loadDataFromGitHub(),
             loadCupboardDataFromGitHub(),
@@ -646,19 +657,31 @@ let productIdMap = new Map();
             loadProductIds(),
             autoSelectWeekday()
         ]);
-    };
 
-    function switchTab(tabId, button) {
-        document.querySelectorAll('.tab-content').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        document.querySelectorAll('.tab-button').forEach(btn => {
-            btn.classList.remove('active');
-        });
+        console.log('Initialization completed');
+        console.log('ZXing available:', !!window.ZXing);
+        console.log('jsQR available:', !!window.jsQR);
+        console.log('ProductID map size:', productIdMap.size);
 
-        document.getElementById(tabId + 'Tab').classList.add('active');
-        button.classList.add('active');
+    } catch (error) {
+        console.error('Initialization error:', error);
+        document.getElementById('error').textContent = 
+            'Error during initialization: ' + error.message;
     }
+};
+
+function switchTab(tabId, button) {
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+
+    document.getElementById(tabId + 'Tab').classList.add('active');
+    button.classList.add('active');
+}
+
 async function loadProductIds() {
     try {
         const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Product_ID.xlsx';
@@ -1221,6 +1244,7 @@ function handleWardSelection() {
     }
 
 let codeReader;
+let scanning = false;
 
 function startScanner() {
     const selectedWard = document.getElementById('wardSelect').value;
@@ -1267,21 +1291,23 @@ async function scanBarcodes() {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
             try {
-                // 1. QR Code 处理
+                // 1. QR Code 處理
                 const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
                 const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
                 if (qrResult) {
+                    console.log('QR Code detected:', qrResult.data);  // 添加日誌
                     const qrContent = qrResult.data;
                     if (qrContent.startsWith('<a>')) {
                         const fMatch = qrContent.match(/<f>(.*?)<\/f>/i);
                         if (fMatch) {
+                            console.log('Found item code in QR:', fMatch[1]);  // 添加日誌
                             handleItemCode(fMatch[1]);
                             return;
                         }
                     }
                 }
 
-                // 2. Data Matrix 和一维码处理
+                // 2. Data Matrix 和一維碼處理
                 const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
                 const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
                 const reader = new ZXing.MultiFormatReader();
@@ -1293,39 +1319,50 @@ async function scanBarcodes() {
                     ZXing.BarcodeFormat.CODE_128
                 ]);
                 
-                const result = reader.decode(binaryBitmap, hints);
-                if (result) {
-                    const scannedText = result.text;
-                    const format = result.getBarcodeFormat();
+                try {
+                    const result = reader.decode(binaryBitmap, hints);
+                    if (result) {
+                        const scannedText = result.text;
+                        const format = result.getBarcodeFormat();
+                        console.log('Barcode detected:', format, scannedText);  // 添加日誌
 
-                    // Data Matrix 处理
-                    if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-                        // 检查是否以 01 开头
-                        if (scannedText.startsWith('01')) {
-                            // 提取 01 到 17 之间的数字
-                            const match = scannedText.match(/01(\d+?)(?=17|$)/);
-                            if (match && match[1]) {
-                                const gtinPart = match[1];
-                                const itemCode = productIdMap.get(gtinPart);
-                                if (itemCode) {
-                                    handleItemCode(itemCode);
-                                    return;
+                        // Data Matrix 處理
+                        if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
+                            console.log('Processing Data Matrix:', scannedText);  // 添加日誌
+                            if (scannedText.startsWith('01')) {
+                                const match = scannedText.match(/01(\d+?)(?=17|$)/);
+                                if (match && match[1]) {
+                                    const gtinPart = match[1];
+                                    console.log('Extracted GTIN:', gtinPart);  // 添加日誌
+                                    const itemCode = productIdMap.get(gtinPart);
+                                    if (itemCode) {
+                                        console.log('Found item code:', itemCode);  // 添加日誌
+                                        handleItemCode(itemCode);
+                                        return;
+                                    }
                                 }
                             }
+                        } 
+                        // 一維碼處理
+                        else if (format === ZXing.BarcodeFormat.EAN_13 || 
+                                format === ZXing.BarcodeFormat.CODE_128) {
+                            console.log('Processing 1D barcode:', scannedText);  // 添加日誌
+                            const itemCode = productIdMap.get(scannedText);
+                            if (itemCode) {
+                                console.log('Found item code:', itemCode);  // 添加日誌
+                                handleItemCode(itemCode);
+                                return;
+                            }
                         }
-                    } 
-                    // 一维码处理
-                    else if (format === ZXing.BarcodeFormat.EAN_13 || 
-                            format === ZXing.BarcodeFormat.CODE_128) {
-                        const itemCode = productIdMap.get(scannedText);
-                        if (itemCode) {
-                            handleItemCode(itemCode);
-                            return;
-                        }
+                    }
+                } catch (readerError) {
+                    // 忽略一般的掃描錯誤
+                    if (readerError.name !== 'NotFoundException') {
+                        console.error('ZXing reader error:', readerError);
                     }
                 }
             } catch (error) {
-                console.error('Scanning error:', error);
+                console.error('General scanning error:', error);
             }
         }
         requestAnimationFrame(tick);
@@ -1334,24 +1371,21 @@ async function scanBarcodes() {
     tick();
 }
 
-
-
 function closeScanner() {
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
     
-    scanning = false;
+    scanning = false;  // 確保設置為 false
     modal.style.display = 'none';
     
     if (video.srcObject) {
-        video.srcObject.getTracks().forEach(track => track.stop());
-    }
-    
-    if (codeReader) {
-        codeReader.reset();
+        const tracks = video.srcObject.getTracks();
+        tracks.forEach(track => {
+            track.stop();  // 停止所有視頻軌道
+        });
+        video.srcObject = null;  // 清除視頻源
     }
 }
-
 
 // 顯示 Loading
 function showLoading() {
@@ -1403,6 +1437,11 @@ async function handleDataMatrix(scannedText) {
 }
 
 function handleItemCode(itemCode) {
+    if (!itemCode) {
+        console.error('No item code provided');
+        return;
+    }
+
     const selectedWard = document.getElementById('wardSelect').value;
     if (!selectedWard) {
         alert('Please select a ward first');
@@ -1410,6 +1449,7 @@ function handleItemCode(itemCode) {
         return;
     }
 
+    console.log('Processing item code:', itemCode);
     document.getElementById('itemCodeFilter').value = itemCode;
     filterItemCodes();
     closeScanner();
