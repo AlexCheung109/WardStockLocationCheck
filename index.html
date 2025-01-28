@@ -9,6 +9,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
 <!-- Include jsQR Library -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<!-- 在 head 部分添加，在其他 script 標籤後面 -->
+<script src="https://unpkg.com/@zxing/library@latest"></script>
+
+
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -1064,11 +1068,28 @@ let productIdMap = new Map();
         document.getElementById('weekdaySelect').value = currentWeekday;
     }
 
+let codeReader;
 
 function startScanner() {
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
     modal.style.display = 'block';
+    
+    // 初始化 ZXing 掃描器
+    codeReader = new ZXing.MultiFormatReader();
+    const hints = new Map();
+    // 設置要識別的條碼類型
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+        ZXing.BarcodeFormat.QR_CODE,          // QR Code
+        ZXing.BarcodeFormat.DATA_MATRIX,      // Data Matrix
+        ZXing.BarcodeFormat.EAN_13,           // EAN-13
+        ZXing.BarcodeFormat.EAN_8,            // EAN-8
+        ZXing.BarcodeFormat.CODE_128,         // Code 128
+        ZXing.BarcodeFormat.CODE_39,          // Code 39
+        ZXing.BarcodeFormat.ITF,              // ITF
+        ZXing.BarcodeFormat.UPC_A,            // UPC-A
+        ZXing.BarcodeFormat.UPC_E            // UPC-E
+    ]);
     
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ 
@@ -1083,12 +1104,90 @@ function startScanner() {
             video.setAttribute('playsinline', true);
             video.play();
             scanning = true;
-            scanQRCode();
+            scanBarcodes();
         })
         .catch(function(error) {
             console.error("Camera error: ", error);
             alert("Error accessing camera. Please make sure you have granted camera permissions.");
         });
+    }
+}
+
+function scanBarcodes() {
+    const video = document.getElementById('scanner-video');
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+
+    async function tick() {
+        if (!scanning) return;
+
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.height = video.videoHeight;
+            canvas.width = video.videoWidth;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            try {
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                // 嘗試使用 ZXing 解碼
+                const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+                
+                try {
+                    const result = codeReader.decode(binaryBitmap);
+                    if (result) {
+                        console.log('Barcode detected:', result.text);
+                        handleScannedCode(result.text);
+                        return;
+                    }
+                } catch (zxingError) {
+                    // ZXing 無法解碼，嘗試使用 jsQR
+                    const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+                    if (qrResult) {
+                        console.log('QR code detected:', qrResult.data);
+                        handleScannedCode(qrResult.data);
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Scanning error:', error);
+            }
+        }
+        requestAnimationFrame(tick);
+    }
+
+    tick();
+}
+
+function handleScannedCode(scannedData) {
+    if (!scannedData) return;
+    
+    console.log('Processing scanned data:', scannedData);
+    
+    // 嘗試解析藥品格式
+    const drugMatch = scannedData.match(/<F>(.*?)<\/F>/);
+    if (drugMatch) {
+        console.log('Drug code detected:', drugMatch[1]);
+        document.getElementById('itemCodeFilter').value = drugMatch[1];
+        filterItemCodes();
+        closeScanner();
+        return;
+    }
+
+    // 處理其他格式的條碼
+    const cleanedCode = scannedData.trim();
+    console.log('Looking up product ID:', cleanedCode);
+    const itemCode = productIdMap.get(cleanedCode);
+    
+    if (itemCode) {
+        console.log('Item code found:', itemCode);
+        document.getElementById('itemCodeFilter').value = itemCode;
+        filterItemCodes();
+        closeScanner();
+    } else {
+        console.log('No item code found for:', cleanedCode);
+        alert(`條碼 ${cleanedCode} 未登記，請手動輸入item code`);
+        document.getElementById('itemCodeFilter').value = '';
+        closeScanner();
     }
 }
 
@@ -1102,58 +1201,12 @@ function closeScanner() {
     if (video.srcObject) {
         video.srcObject.getTracks().forEach(track => track.stop());
     }
-}
-
-function scanQRCode() {
-    const video = document.getElementById('scanner-video');
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-
-    function tick() {
-        if (!scanning) return;
-
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvas.height = video.videoHeight;
-            canvas.width = video.videoWidth;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-            if (code) {
-                handleScannedCode(code.data);
-            }
-        }
-        requestAnimationFrame(tick);
-    }
-
-    tick();
-}
-
-function handleScannedCode(scannedData) {
-    // 嘗試解析藥品格式
-    const drugMatch = scannedData.match(/<F>(.*?)<\/F>/);
-    if (drugMatch) {
-        document.getElementById('itemCodeFilter').value = drugMatch[1];
-        filterItemCodes();
-        closeScanner();
-        return;
-    }
-
-    // 處理其他格式的條碼
-    const cleanedCode = scannedData.trim();
-    const itemCode = productIdMap.get(cleanedCode);
     
-    if (itemCode) {
-        document.getElementById('itemCodeFilter').value = itemCode;
-        filterItemCodes();
-        closeScanner();
-    } else {
-        alert(`條碼 ${cleanedCode} 未登記，請手動輸入item code`);
-        document.getElementById('itemCodeFilter').value = '';
-        closeScanner();
+    if (codeReader) {
+        codeReader.reset();
     }
 }
+
 </script>
 </body>
 </html>
