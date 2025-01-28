@@ -6,15 +6,11 @@
     <title>Ward Stock System</title>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
     <!-- Include QRious Library for QR Code Generation -->
-  
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
 <!-- Include jsQR Library -->
-
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <!-- 在 head 部分添加，在其他 script 標籤後面 -->
 <script src="https://unpkg.com/@zxing/library@latest"></script>
-
-
-<!-- 在 head 部分添加 -->
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
 
     <style>
@@ -1236,12 +1232,11 @@ function handleWardSelection() {
 
 let codeReader;
 let scanning = false;
-let frameCount = 0;
 
 function startScanner() {
     const selectedWard = document.getElementById('wardSelect').value;
     if (!selectedWard) {
-        alert('請先選擇病房');
+        alert('Please select a ward first');
         return;
     }
 
@@ -1263,8 +1258,8 @@ function startScanner() {
             scanBarcodes();
         })
         .catch(function(error) {
-            console.error("相機錯誤: ", error);
-            alert("無法訪問相機，請確認已授予相機權限。");
+            console.error("Camera error: ", error);
+            alert("Error accessing camera. Please make sure you have granted camera permissions.");
         });
     }
 }
@@ -1286,18 +1281,15 @@ async function scanBarcodes() {
                 // 1. QR Code 處理
                 const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
                 const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
-                
                 if (qrResult) {
                     console.log('QR Code detected:', qrResult.data);
-                    // 修改為大寫 F 標籤的匹配
-                    const match = qrResult.data.match(/<F>(.*?)<\/F>/);
-                    if (match && match[1]) {
-                        const value = match[1];
-                        console.log('Found value in F tags:', value);
-                        document.getElementById('itemCodeFilter').value = value;
-                        filterItemCodes();
-                        closeScanner();
-                        return;
+                    const qrContent = qrResult.data;
+                    if (qrContent.includes('<f>') && qrContent.includes('</f>')) {
+                        const fMatch = qrContent.match(/<f>(.*?)<\/f>/);
+                        if (fMatch && fMatch[1]) {
+                            handleItemCode(fMatch[1]);
+                            return;
+                        }
                     }
                 }
 
@@ -1318,61 +1310,76 @@ async function scanBarcodes() {
                     if (result) {
                         const scannedText = result.text;
                         const format = result.getBarcodeFormat();
-                        console.log('條碼類型:', format, '內容:', scannedText);
+                        console.log('Barcode detected:', format, scannedText);
 
+                        // Data Matrix 處理
                         if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-                            // 尋找 01 之後到 10 之前的數字
-                            const match = scannedText.match(/01(\d+?)(?=10|$)/);
-                            if (match && match[1]) {
-                                const extractedNumber = match[1];
-                                const itemCode = productIdMap.get(extractedNumber);
+                            console.log('Processing Data Matrix:', scannedText);
+                            // 檢查是否含有01到10之間的數字
+                            const numbers = scannedText.match(/0[1-9]|10/g);
+                            if (numbers) {
+                                const firstMatch = numbers[0];
+                                console.log('Extracted number:', firstMatch);
+                                const itemCode = productIdMap.get(firstMatch);
                                 if (itemCode) {
+                                    console.log('Found item code:', itemCode);
                                     handleItemCode(itemCode);
                                     return;
                                 }
                             }
-                        } else if (format === ZXing.BarcodeFormat.EAN_13 || 
-                                 format === ZXing.BarcodeFormat.CODE_128) {
+                            
+                            // 如果找不到，顯示錯誤訊息
+                            alert(`無法識別的條碼格式或未找到對應的商品代碼`);
+                            closeScanner();
+                            return;
+                        }
+                        // 一維碼處理
+                        else if (format === ZXing.BarcodeFormat.EAN_13 || 
+                                format === ZXing.BarcodeFormat.CODE_128) {
                             const normalizedText = normalizeBarcode(scannedText);
                             const itemCode = productIdMap.get(normalizedText);
                             if (itemCode) {
                                 handleItemCode(itemCode);
                                 return;
+                            } else {
+                                alert(`條碼 ${normalizedText} 未在系統中登記`);
+                                closeScanner();
+                                return;
                             }
                         }
                     }
-                } catch (error) {
-                    if (error.name !== 'NotFoundException') {
-                        console.error('條碼讀取錯誤:', error);
+                } catch (readerError) {
+                    // 只有當錯誤不是 NotFoundException 時才處理
+                    if (readerError.name !== 'NotFoundException') {
+                        console.error('ZXing reader error:', readerError);
                     }
                 }
             } catch (error) {
-                console.error('掃描錯誤:', error);
+                console.error('General scanning error:', error);
             }
-            requestAnimationFrame(tick);
-        } else {
-            requestAnimationFrame(tick);
         }
+        requestAnimationFrame(tick);
     }
 
     tick();
 }
+
+
 function closeScanner() {
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
     
-    scanning = false;
+    scanning = false;  // 確保設置為 false
     modal.style.display = 'none';
     
     if (video.srcObject) {
         const tracks = video.srcObject.getTracks();
         tracks.forEach(track => {
-            track.stop();
+            track.stop();  // 停止所有視頻軌道
         });
-        video.srcObject = null;
+        video.srcObject = null;  // 清除視頻源
     }
 }
-
 
 // 顯示 Loading
 function showLoading() {
@@ -1449,18 +1456,18 @@ async function handleDataMatrix(scannedText) {
 }
 function handleItemCode(itemCode) {
     if (!itemCode) {
-        console.error('未提供項目代碼');
+        console.error('No item code provided');
         return;
     }
 
     const selectedWard = document.getElementById('wardSelect').value;
     if (!selectedWard) {
-        alert('請先選擇病房');
+        alert('Please select a ward first');
         closeScanner();
         return;
     }
 
-    console.log('處理項目代碼:', itemCode);
+    console.log('Processing item code:', itemCode);
     document.getElementById('itemCodeFilter').value = itemCode;
     filterItemCodes();
     closeScanner();
