@@ -1223,18 +1223,24 @@ function startScanner() {
     // 初始化 ZXing 掃描器
     codeReader = new ZXing.MultiFormatReader();
     const hints = new Map();
-    // 設置要識別的條碼類型
+    
+    // 設置要識別的條碼類型，確保包含所有 GTIN 相關格式
     hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-        ZXing.BarcodeFormat.QR_CODE,          // QR Code
-        ZXing.BarcodeFormat.DATA_MATRIX,      // Data Matrix
-        ZXing.BarcodeFormat.EAN_13,           // EAN-13
-        ZXing.BarcodeFormat.EAN_8,            // EAN-8
-        ZXing.BarcodeFormat.CODE_128,         // Code 128
-        ZXing.BarcodeFormat.CODE_39,          // Code 39
-        ZXing.BarcodeFormat.ITF,              // ITF
-        ZXing.BarcodeFormat.UPC_A,            // UPC-A
-        ZXing.BarcodeFormat.UPC_E            // UPC-E
+        ZXing.BarcodeFormat.EAN_8,        // GTIN-8
+        ZXing.BarcodeFormat.EAN_13,       // GTIN-13
+        ZXing.BarcodeFormat.UPC_A,        // GTIN-12
+        ZXing.BarcodeFormat.UPC_E,        // UPC-E (縮短版的 UPC)
+        ZXing.BarcodeFormat.CODE_128,     // GS1-128 (可用於 GTIN-14)
+        ZXing.BarcodeFormat.ITF,          // ITF-14 (用於 GTIN-14)
+        ZXing.BarcodeFormat.QR_CODE,
+        ZXing.BarcodeFormat.DATA_MATRIX
     ]);
+
+    // 添加其他解碼提示
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);     // 更努力嘗試解碼
+    hints.set(ZXing.DecodeHintType.ASSUME_GS1, true);     // 假設是 GS1 格式（包括 GTIN）
+
+    codeReader.hints = hints;
     
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ 
@@ -1302,7 +1308,6 @@ function scanBarcodes() {
 
     tick();
 }
-
 function handleScannedCode(scannedData) {
     if (!scannedData) return;
     
@@ -1313,7 +1318,7 @@ function handleScannedCode(scannedData) {
         return;
     }
     
-    console.log('Processing scanned data:', scannedData);
+    console.log('原始掃描數據:', scannedData);
     
     // 清理掃描到的數據
     let cleanedCode = scannedData.trim();
@@ -1327,18 +1332,44 @@ function handleScannedCode(scannedData) {
     }
 
     // 處理 GTIN 格式
-    // 移除可能的 GS1 應用標識符 (AI)
-    cleanedCode = cleanedCode.replace(/^\(01\)/, '');  // 移除 GTIN 的 AI (01)
+    // 移除所有可能的 GS1 應用標識符 (AI)
+    cleanedCode = cleanedCode
+        .replace(/^\(01\)/, '')     // 移除 GTIN 的 AI (01)
+        .replace(/\([0-9]{2}\)/g, '') // 移除其他 AI
+        .replace(/[^0-9]/g, '');    // 只保留數字
+    
+    console.log('清理後的條碼:', cleanedCode);
     
     // 確保 GTIN 格式正確（8、12、13 或 14位數字）
-    const gtinMatch = cleanedCode.match(/^\d{8}$|^\d{12,14}$/);
+    const gtinMatch = cleanedCode.match(/^(\d{8}|\d{12}|\d{13}|\d{14})$/);
     if (gtinMatch) {
-        console.log('GTIN detected:', cleanedCode);
+        console.log('檢測到 GTIN:', cleanedCode);
+        // 直接使用完整的 GTIN 查找
+        let itemCode = productIdMap.get(cleanedCode);
+        
+        // 如果找不到，嘗試不同的 GTIN 長度
+        if (!itemCode && cleanedCode.length === 14) {
+            // 嘗試去掉 GTIN-14 的包裝層級指示符
+            const gtin13 = cleanedCode.substring(1);
+            itemCode = productIdMap.get(gtin13);
+            console.log('嘗試 GTIN-13:', gtin13);
+        }
+        
+        if (itemCode) {
+            console.log('找到對應的 item code:', itemCode);
+            handleItemCode(itemCode, selectedWard);
+        } else {
+            console.log('找不到對應的 item code');
+            alert(`無法找到此 GTIN (${cleanedCode}) 對應的 item code，請手動輸入`);
+            document.getElementById('itemCodeFilter').value = '';
+            closeScanner();
+        }
+    } else {
+        // 如果不是標準 GTIN 格式，嘗試作為一般條碼處理
+        console.log('非標準 GTIN 格式，嘗試一般條碼處理:', cleanedCode);
+        const itemCode = productIdMap.get(cleanedCode);
+        handleItemCode(itemCode, selectedWard);
     }
-
-    // 查找對應的 item code
-    const itemCode = productIdMap.get(cleanedCode);
-    handleItemCode(itemCode, selectedWard);
 }
 
 // 新增處理 item code 的輔助函數
