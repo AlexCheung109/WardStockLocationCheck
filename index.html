@@ -701,6 +701,10 @@ async function loadProductIds() {
     }
 }
 
+function normalizeBarcode(text) {
+    return text.toString().trim().toUpperCase();
+}
+
     async function loadDataFromGitHub() {
         const loading = document.getElementById('loading');
         loading.style.display = 'block';
@@ -1310,31 +1314,45 @@ async function scanBarcodes() {
 
                         // Data Matrix 處理
                         if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-                            if (scannedText.startsWith('01')) {
-                                const match = scannedText.match(/01(\d+?)(?=17|$)/);
+                            console.log('Processing Data Matrix:', scannedText);
+                            // 使用 normalizeBarcode 處理掃描文字
+                            const normalizedText = normalizeBarcode(scannedText);
+                            const itemCode = productIdMap.get(normalizedText);
+                            if (itemCode) {
+                                console.log('Found item code:', itemCode);
+                                handleItemCode(itemCode);
+                                return;
+                            }
+                            
+                            // 如果直接查找失敗，檢查是否是 GS1 格式
+                            if (normalizedText.startsWith('01')) {
+                                const match = normalizedText.match(/01(\d+?)(?=17|$)/);
                                 if (match && match[1]) {
                                     const gtinPart = match[1];
-                                    const itemCode = productIdMap.get(gtinPart);
-                                    if (itemCode) {
-                                        handleItemCode(itemCode);
-                                        return;
-                                    } else {
-                                        alert(`條碼 ${gtinPart} 未在系統中登記`);
-                                        closeScanner();
+                                    console.log('Extracted GTIN:', gtinPart);
+                                    const itemCodeFromGTIN = productIdMap.get(gtinPart);
+                                    if (itemCodeFromGTIN) {
+                                        handleItemCode(itemCodeFromGTIN);
                                         return;
                                     }
                                 }
                             }
-                        } 
+                            
+                            // 如果都找不到，顯示錯誤訊息
+                            alert(`條碼 ${normalizedText} 未在系統中登記`);
+                            closeScanner();
+                            return;
+                        }
                         // 一維碼處理
                         else if (format === ZXing.BarcodeFormat.EAN_13 || 
                                 format === ZXing.BarcodeFormat.CODE_128) {
-                            const itemCode = productIdMap.get(scannedText);
+                            const normalizedText = normalizeBarcode(scannedText);
+                            const itemCode = productIdMap.get(normalizedText);
                             if (itemCode) {
                                 handleItemCode(itemCode);
                                 return;
                             } else {
-                                alert(`條碼 ${scannedText} 未在系統中登記`);
+                                alert(`條碼 ${normalizedText} 未在系統中登記`);
                                 closeScanner();
                                 return;
                             }
@@ -1355,6 +1373,8 @@ async function scanBarcodes() {
 
     tick();
 }
+
+
 
 function closeScanner() {
     const modal = document.getElementById('scannerModal');
