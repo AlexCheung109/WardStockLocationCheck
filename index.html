@@ -7,110 +7,56 @@
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
     <!-- Include QRious Library for QR Code Generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+<!-- Include jsQR Library -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<!-- 在 head 部分添加，在其他 script 標籤後面 -->
+<script src="https://unpkg.com/@zxing/library@latest"></script>
+
+
     <style>
 
-/* 在現有的 style 標籤中添加 */
-
-.error-message {
-    color: #721c24;
-    background-color: #f8d7da;
-    border: 1px solid #f5c6cb;
-    border-radius: 4px;
-    padding: 10px;
-    margin-top: 10px;
-    font-size: 14px;
-    animation: fadeIn 0.3s ease-in;
+.required {
+    color: red;
+    margin-left: 4px;
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+select:disabled,
+input:disabled {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
 }
 
-.search-input-group {
-    display: flex;
-    gap: 10px;
-    align-items: center;
+button:disabled {
+    background-color: #cccccc !important;
+    cursor: not-allowed;
+    opacity: 0.7;
 }
 
-.scan-button {
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    padding: 8px 15px;
-    border-radius: 4px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 5px;
+.search-group label {
+    font-weight: bold;
 }
 
-.scan-button:hover {
-    background-color: #45a049;
+
+input:disabled {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
 }
 
-.scan-icon {
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M3 9h18v6H3z"/></svg>');
-    background-repeat: no-repeat;
+button:disabled {
+    background-color: #cccccc !important;
+    cursor: not-allowed;
+    opacity: 0.7;
 }
-
-.scanner-modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.7);
-    z-index: 1000;
-}
-
-.scanner-content {
+.scanner-overlay {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background-color: white;
-    padding: 20px;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 400px;
-}
-
-.scanner-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-}
-
-.close-button {
-    background: none;
-    border: none;
-    font-size: 24px;
-    cursor: pointer;
-}
-
-#scanner-container {
-    position: relative;
-    width: 100%;
-    height: 300px;
-}
-
-#scanner-video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 4px;
+    width: 80%;
+    height: 60%;
+    border: 2px solid #4CAF50;
+    border-radius: 10px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
 }
 
 .scanning-line {
@@ -118,22 +64,20 @@
     width: 100%;
     height: 2px;
     background-color: #4CAF50;
-    top: 50%;
     animation: scan 2s linear infinite;
 }
 
 @keyframes scan {
     0% {
-        transform: translateY(-50px);
+        transform: translateY(-100px);
     }
     50% {
-        transform: translateY(50px);
+        transform: translateY(100px);
     }
     100% {
-        transform: translateY(-50px);
+        transform: translateY(-100px);
     }
 }
-
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
@@ -291,6 +235,78 @@
             font-size: 14px;
             color: #333;
         }
+.search-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.scan-button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.scan-button:hover {
+    background-color: #45a049;
+}
+
+.scanner-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+}
+
+.scanner-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 400px;
+}
+
+.scanner-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+#scanner-container {
+    position: relative;
+    width: 100%;
+    height: 300px;
+}
+
+#scanner-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
         /* Item Code Text Style */
         .item-code {
             margin-top: 10px;
@@ -380,43 +396,52 @@
     <div id="binShelveTab" class="tab-content active container">
         <h1>Ward Stock Item Bin Shelve Checker</h1>
         <div id="binShelveUpdateInfo" class="update-info"></div>
+        <div id="productIdUpdateInfo" class="update-info"></div>
         <div id="itemPhqUpdateInfo" class="update-info"></div>
         
         <div id="loading">Loading...</div>
         <div id="error" class="error"></div>
 
-        <div class="search-group">
-            <label for="wardSelect">Ward:</label>
-            <select id="wardSelect" onchange="displayItemCodes()">
-                <option value="">Please select a ward</option>
-            </select>
-        </div>
+<div class="search-group">
+    <label for="wardSelect">Ward: <span class="required">*</span></label>
+    <select id="wardSelect">
+        <option value="">Please select a ward</option>
+    </select>
+</div>
 
-        <!-- Item Code Filter -->
+<!-- Item Code Filter -->
 <div class="search-group">
     <label for="itemCodeFilter">Filter by Item Code:</label>
     <div class="search-input-group">
-        <input type="text" id="itemCodeFilter" placeholder="Enter Item Code" oninput="filterItemCodes()">
-        <button id="scanButton" class="scan-button" onclick="startScanner()">
-            <i class="scan-icon"></i>
-            Scan
+        <input type="text" 
+               id="itemCodeFilter" 
+               placeholder="Please select a ward first" 
+               disabled 
+               oninput="filterItemCodes()">
+        <button id="scanButton" 
+                class="scan-button" 
+                onclick="startScanner()" 
+                disabled>
+            Scan Barcode
         </button>
-    </div>
-    <!-- 添加掃描器視窗 -->
-    <div id="scannerModal" class="scanner-modal">
-        <div class="scanner-content">
-            <div class="scanner-header">
-                <span>Scan QR Code</span>
-                <button class="close-button" onclick="closeScanner()">&times;</button>
-            </div>
-            <div id="scanner-container">
-                <video id="scanner-video" playsinline></video>
-                <div class="scanning-line"></div>
-            </div>
-        </div>
     </div>
 </div>
 
+<!-- Scanner Modal -->
+<div id="scannerModal" class="scanner-modal">
+    <div class="scanner-content">
+        <div class="scanner-header">
+            <span>Scan Barcode</span>
+            <button class="close-button" onclick="closeScanner()">&times;</button>
+        </div>
+        <div id="scanner-container">
+            <video id="scanner-video" playsinline></video>
+            <div class="scanner-overlay"></div>
+            <div class="scanning-line"></div>
+        </div>
+    </div>
+</div>
+        
         <!-- Removed the Item Code Select and Search Button -->
         <!-- The item codes will be displayed automatically upon ward selection -->
 
@@ -493,111 +518,13 @@
             </div>
         </div>
     </div>
-
-
-
-
-
 <script>
-
-// 添加 jsQR 库
-const script = document.createElement('script');
-script.src = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js";
-document.head.appendChild(script);
-
-let scanning = false;
-let scanner = null;
-
-function startScanner() {
-    const modal = document.getElementById('scannerModal');
-    const video = document.getElementById('scanner-video');
-    modal.style.display = 'block';
-    
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ 
-            video: { 
-                facingMode: "environment",
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            } 
-        })
-        .then(function(stream) {
-            video.srcObject = stream;
-            video.setAttribute('playsinline', true);
-            video.play();
-            scanning = true;
-            scanQRCode();
-        })
-        .catch(function(error) {
-            console.error("Camera error: ", error);
-            alert("Error accessing camera. Please make sure you have granted camera permissions.");
-        });
-    }
-}
-
-function closeScanner() {
-    const modal = document.getElementById('scannerModal');
-    const video = document.getElementById('scanner-video');
-    
-    scanning = false;
-    modal.style.display = 'none';
-    
-    if (video.srcObject) {
-        video.srcObject.getTracks().forEach(track => track.stop());
-    }
-}
-
-function scanQRCode() {
-    const video = document.getElementById('scanner-video');
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-
-    function tick() {
-        if (!scanning) return;
-
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvas.height = video.videoHeight;
-            canvas.width = video.videoWidth;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-            if (code) {
-                // 解析二維碼數據
-                const qrData = code.data;
-                
-                // 解析藥品格式
-                const drugMatch = qrData.match(/<F>(.*?)<\/F>/);
-                if (drugMatch) {
-                    document.getElementById('itemCodeFilter').value = drugMatch[1];
-                    filterItemCodes();
-                    closeScanner();
-                    return;
-                }
-                
-                // 解析數字序列格式
-                if (qrData.length >= 17 && /^\d{17}/.test(qrData)) {
-                    const itemCode = qrData.substring(0, 17);
-                    document.getElementById('itemCodeFilter').value = itemCode;
-                    filterItemCodes();
-                    closeScanner();
-                    return;
-                }
-            }
-        }
-        requestAnimationFrame(tick);
-    }
-
-    tick();
-}
-
-
     let data = [];
     let wards = new Set();
     let cupboardData = [];
     let cupboardWards = new Set();
     let itemDescriptions = new Map();
+let productIdMap = new Map();
 
     // Mapping for Duty and Weekday to Scanner
     const dutyWeekdayScannerMap = {
@@ -686,6 +613,7 @@ function scanQRCode() {
         const cupboardDate = await getFileLastUpdateDate('WardStockCupboard.xlsx');
         const itemPhqDate = await getFileLastUpdateDate('item_phq.xlsx');
         const dataCaptureDate = await getFileLastUpdateDate('Top_up_schedule_p1.png');
+        const productIdDate = await getFileLastUpdateDate('product_id.xlsx');
         
         document.getElementById('binShelveUpdateInfo').textContent = 
             `Bin shelve information last updated on: ${locationDate}`;
@@ -695,11 +623,14 @@ function scanQRCode() {
             `Item_phq.xlsx last updated on: ${itemPhqDate}`;
         document.getElementById('dataCaptureUpdateInfo').textContent = 
             `Data Capture last updated on: ${dataCaptureDate}`;
+        document.getElementById('productIdUpdateInfo').textContent = // 新增這行
+        `Product ID mapping last updated on: ${productIdDate}`; // 新增這行
 
         await Promise.all([
             loadDataFromGitHub(),
             loadCupboardDataFromGitHub(),
             loadItemDescriptions(),
+            loadProductIds(),
             autoSelectWeekday()
         ]);
     };
@@ -715,6 +646,41 @@ function scanQRCode() {
         document.getElementById(tabId + 'Tab').classList.add('active');
         button.classList.add('active');
     }
+async function loadProductIds() {
+    try {
+        const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Product_ID.xlsx';
+        const response = await fetch(excelUrl);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        const productData = XLSX.utils.sheet_to_json(worksheet, {
+            header: ['itemCode', 'productId'],
+            range: 1
+        });
+
+        // 清空當前的 Map
+        productIdMap.clear();
+        
+        // 將 productId 作為 key，itemCode 作為 value 存入 Map
+        productData.forEach(row => {
+            if (row.productId && row.itemCode) {
+                productIdMap.set(row.productId.toString().trim(), row.itemCode.toString().trim());
+            }
+        });
+        
+        console.log('Product ID mapping loaded:', productIdMap.size, 'entries');
+        
+    } catch (error) {
+        console.error('Error loading product IDs:', error);
+        document.getElementById('error').textContent = 'Error loading product IDs: ' + error.message;
+    }
+}
 
     async function loadDataFromGitHub() {
         const loading = document.getElementById('loading');
@@ -848,16 +814,42 @@ function scanQRCode() {
         }
     }
 
-    function updateWardSelect() {
-        const select = document.getElementById('wardSelect');
-        select.innerHTML = '<option value="">Please select a ward</option>';
-        
-        Array.from(wards).sort(sortWardsDesc).forEach(ward => {
-            const option = document.createElement('option');
-            option.value = ward;
-            option.textContent = ward;
-            select.appendChild(option);
-        });
+// 找到 updateWardSelect 函數，修改如下：
+function updateWardSelect() {
+    const select = document.getElementById('wardSelect');
+    select.innerHTML = '<option value="">Please select a ward</option>';
+    
+    Array.from(wards).sort(sortWardsDesc).forEach(ward => {
+        const option = document.createElement('option');
+        option.value = ward;
+        option.textContent = ward;
+        select.appendChild(option);
+    });
+
+    // 添加 onchange 事件監聽器
+    select.onchange = handleWardSelection;
+
+// 添加新的函數來處理 ward 選擇
+function handleWardSelection() {
+    const selectedWard = document.getElementById('wardSelect').value;
+    const itemCodeFilter = document.getElementById('itemCodeFilter');
+    const scanButton = document.getElementById('scanButton');
+    
+    if (selectedWard) {
+        // 啟用 item code filter 和 scan button
+        itemCodeFilter.disabled = false;
+        scanButton.disabled = false;
+        itemCodeFilter.placeholder = "Enter Item Code";
+        displayItemCodes(); // 顯示該病房的 item codes
+    } else {
+        // 禁用 item code filter 和 scan button
+        itemCodeFilter.disabled = true;
+        scanButton.disabled = true;
+        itemCodeFilter.placeholder = "Please select a ward first";
+        itemCodeFilter.value = ''; // 清空輸入
+        document.getElementById('result').innerHTML = ''; // 清空結果
+    }
+}
     }
 
     // Helper function to parse ward into letters, number, and suffix
@@ -1214,6 +1206,216 @@ function scanQRCode() {
         const currentWeekday = weekdayMap[weekdayNumber] || "Monday";
         document.getElementById('weekdaySelect').value = currentWeekday;
     }
+
+let codeReader;
+
+function startScanner() {
+    const selectedWard = document.getElementById('wardSelect').value;
+    if (!selectedWard) {
+        alert('Please select a ward first');
+        return;
+    }
+
+    const modal = document.getElementById('scannerModal');
+    const video = document.getElementById('scanner-video');
+    modal.style.display = 'block';
+    
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: "environment"
+            } 
+        })
+        .then(function(stream) {
+            video.srcObject = stream;
+            video.setAttribute('playsinline', true);
+            video.play();
+            scanning = true;
+            scanBarcodes();
+        })
+        .catch(function(error) {
+            console.error("Camera error: ", error);
+            alert("Error accessing camera. Please make sure you have granted camera permissions.");
+        });
+    }
+}
+
+function scanBarcodes() {
+    const video = document.getElementById('scanner-video');
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    
+    // 降低處理的圖像大小以提高性能
+    const SCAN_WIDTH = 640;  // 適中的掃描寬度
+    const SCAN_HEIGHT = 480; // 適中的掃描高度
+    
+    canvas.width = SCAN_WIDTH;
+    canvas.height = SCAN_HEIGHT;
+    
+    // 用於控制掃描頻率
+    let lastScanTime = 0;
+    const SCAN_INTERVAL = 100; // 每100ms掃描一次
+
+    async function tick() {
+        if (!scanning) return;
+        
+        // 控制掃描頻率
+        const now = Date.now();
+        if (now - lastScanTime < SCAN_INTERVAL) {
+            requestAnimationFrame(tick);
+            return;
+        }
+        lastScanTime = now;
+
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            // 只掃描中間區域
+            const sourceX = (video.videoWidth - SCAN_WIDTH) / 2;
+            const sourceY = (video.videoHeight - SCAN_HEIGHT) / 2;
+            
+            // 降低解析度提高速度
+            context.drawImage(
+                video,
+                sourceX, sourceY, SCAN_WIDTH, SCAN_HEIGHT,  // 源圖像區域
+                0, 0, canvas.width, canvas.height           // 目標區域
+            );
+            
+            try {
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                
+                // 使用 Promise.race 來實現超時控制
+                const scanPromise = new Promise(async (resolve) => {
+                    // 優先檢查 DataMatrix，因為這是你主要需要的
+                    try {
+                        const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                        const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+                        const reader = new ZXing.MultiFormatReader();
+                        
+                        const hints = new Map();
+                        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                            ZXing.BarcodeFormat.DATA_MATRIX,  // 優先 DataMatrix
+                            ZXing.BarcodeFormat.QR_CODE,      // 其次 QR
+                            ZXing.BarcodeFormat.EAN_13        // 最後一維碼
+                        ]);
+                        hints.set(ZXing.DecodeHintType.TRY_HARDER, false); // 關閉深度搜索
+                        
+                        const result = reader.decode(binaryBitmap, hints);
+                        if (result) {
+                            resolve({ type: 'zxing', data: result.text });
+                            return;
+                        }
+                    } catch (zxingError) {
+                        // 如果 ZXing 失敗，立即嘗試 jsQR
+                        const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+                        if (qrResult) {
+                            resolve({ type: 'qr', data: qrResult.data });
+                            return;
+                        }
+                    }
+                    resolve(null);
+                });
+                
+                // 設置超時
+                const timeoutPromise = new Promise((resolve) => {
+                    setTimeout(() => resolve(null), 100); // 100ms 超時
+                });
+                
+                const result = await Promise.race([scanPromise, timeoutPromise]);
+                
+                if (result) {
+                    console.log(`Detected (${result.type}):`, result.data);
+                    if (handleScannedCode(result.data)) {
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Scanning error:', error);
+            }
+        }
+        requestAnimationFrame(tick);
+    }
+
+    tick();
+}
+
+
+function handleScannedCode(scannedData) {
+    if (!scannedData) return false;
+    
+    const selectedWard = document.getElementById('wardSelect').value;
+    if (!selectedWard) {
+        alert('Please select a ward first');
+        closeScanner();
+        return false;
+    }
+    
+    // 使用 Map 來存儲正則表達式，避免重複創建
+    const patterns = new Map([
+        ['drug', /<F>(.*?)<\/F>/],
+        ['gtin', /GTIN[:\s]*(\d+)/i],
+        ['numeric', /^\d+$/]
+    ]);
+    
+    // 檢查 <F></F> 格式
+    const drugMatch = scannedData.match(patterns.get('drug'));
+    if (drugMatch) {
+        handleItemCode(drugMatch[1], selectedWard);
+        return true;
+    }
+    
+    // 檢查 GTIN
+    const gtinMatch = scannedData.match(patterns.get('gtin'));
+    if (gtinMatch) {
+        const itemCode = productIdMap.get(gtinMatch[1]);
+        if (itemCode) {
+            handleItemCode(itemCode, selectedWard);
+            return true;
+        }
+    }
+    
+    // 檢查純數字
+    if (patterns.get('numeric').test(scannedData)) {
+        const itemCode = productIdMap.get(scannedData);
+        if (itemCode) {
+            handleItemCode(itemCode, selectedWard);
+            return true;
+        }
+    }
+    
+    console.log('無法識別的條碼格式');
+    return false;
+}
+function handleItemCode(itemCode, selectedWard) {
+    console.log('處理 item code:', itemCode, '病房:', selectedWard);
+    
+    const itemExists = data.some(row => 
+        row.ward === selectedWard && 
+        row.itemCode.toString() === itemCode.toString()
+    );
+
+    if (!itemExists) {
+        alert(`This item is not a ward stock item of ${selectedWard}`);
+    }
+
+    document.getElementById('itemCodeFilter').value = itemCode;
+    filterItemCodes();
+    closeScanner();
+}
+function closeScanner() {
+    const modal = document.getElementById('scannerModal');
+    const video = document.getElementById('scanner-video');
+    
+    scanning = false;
+    modal.style.display = 'none';
+    
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+    }
+    
+    if (codeReader) {
+        codeReader.reset();
+    }
+}
+
 </script>
 </body>
 </html>
