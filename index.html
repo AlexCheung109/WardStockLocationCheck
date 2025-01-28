@@ -1284,9 +1284,9 @@ async function scanBarcodes() {
                 if (qrResult) {
                     console.log('QR Code detected:', qrResult.data);
                     const qrContent = qrResult.data;
-                    if (qrContent.startsWith('<a>')) {
-                        const fMatch = qrContent.match(/<f>(.*?)<\/f>/i);
-                        if (fMatch) {
+                    if (qrContent.includes('<f>') && qrContent.includes('</f>')) {
+                        const fMatch = qrContent.match(/<f>(.*?)<\/f>/);
+                        if (fMatch && fMatch[1]) {
                             handleItemCode(fMatch[1]);
                             return;
                         }
@@ -1315,31 +1315,21 @@ async function scanBarcodes() {
                         // Data Matrix 處理
                         if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
                             console.log('Processing Data Matrix:', scannedText);
-                            // 使用 normalizeBarcode 處理掃描文字
-                            const normalizedText = normalizeBarcode(scannedText);
-                            const itemCode = productIdMap.get(normalizedText);
-                            if (itemCode) {
-                                console.log('Found item code:', itemCode);
-                                handleItemCode(itemCode);
-                                return;
-                            }
-                            
-                            // 如果直接查找失敗，檢查是否是 GS1 格式
-                            if (normalizedText.startsWith('01')) {
-                                const match = normalizedText.match(/01(\d+?)(?=17|$)/);
-                                if (match && match[1]) {
-                                    const gtinPart = match[1];
-                                    console.log('Extracted GTIN:', gtinPart);
-                                    const itemCodeFromGTIN = productIdMap.get(gtinPart);
-                                    if (itemCodeFromGTIN) {
-                                        handleItemCode(itemCodeFromGTIN);
-                                        return;
-                                    }
+                            // 檢查是否含有01到10之間的數字
+                            const numbers = scannedText.match(/0[1-9]|10/g);
+                            if (numbers) {
+                                const firstMatch = numbers[0];
+                                console.log('Extracted number:', firstMatch);
+                                const itemCode = productIdMap.get(firstMatch);
+                                if (itemCode) {
+                                    console.log('Found item code:', itemCode);
+                                    handleItemCode(itemCode);
+                                    return;
                                 }
                             }
                             
-                            // 如果都找不到，顯示錯誤訊息
-                            alert(`條碼 ${normalizedText} 未在系統中登記`);
+                            // 如果找不到，顯示錯誤訊息
+                            alert(`無法識別的條碼格式或未找到對應的商品代碼`);
                             closeScanner();
                             return;
                         }
@@ -1373,7 +1363,6 @@ async function scanBarcodes() {
 
     tick();
 }
-
 
 
 function closeScanner() {
