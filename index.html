@@ -5,11 +5,92 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ward Stock System</title>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <!-- Include QRious Library for QR Code Generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-    <script src="https://unpkg.com/@zxing/library@latest"></script>
+<!-- Include jsQR Library -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<!-- 在 head 部分添加，在其他 script 標籤後面 -->
+<script src="https://unpkg.com/@zxing/library@latest"></script>
+
 
     <style>
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.required {
+    color: red;
+    margin-left: 4px;
+}
+
+select:disabled,
+input:disabled {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+}
+
+button:disabled {
+    background-color: #cccccc !important;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.search-group label {
+    font-weight: bold;
+}
+
+
+input:disabled {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+}
+
+button:disabled {
+    background-color: #cccccc !important;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+.scanner-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    height: 60%;
+    border: 2px solid #4CAF50;
+    border-radius: 10px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+}
+
+.scanning-line {
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    background-color: #4CAF50;
+    animation: scan 2s linear infinite;
+}
+
+@keyframes scan {
+    0% {
+        transform: translateY(-100px);
+    }
+    50% {
+        transform: translateY(100px);
+    }
+    100% {
+        transform: translateY(-100px);
+    }
+}
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
@@ -61,10 +142,6 @@
         button:hover {
             background-color: #45a049;
         }
-        button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
         #result, #cupboardResult, #dutyQueryResult, .wardDropdown {
             margin-top: 20px;
             padding: 15px;
@@ -89,7 +166,7 @@
             display: flex;
             gap: 10px;
             margin-bottom: 20px;
-            flex-wrap: wrap;
+            flex-wrap: wrap; /* Allow wrapping if needed */
         }
         .tab-button {
             padding: 10px 20px;
@@ -141,71 +218,172 @@
             display: block;
             line-height: 1.4;
             margin-bottom: 10px;
-            font-size: 50%;
+            font-size: 50%; /* Reduced font size by half */
         }
-        .search-input-group {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        .scan-button {
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 4px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        .scan-button:hover {
-            background-color: #45a049;
-        }
-        .scanner-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            z-index: 1000;
-        }
-        .scanner-content {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: white;
-            padding: 20px;
+        #scheduleImages img {
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             border-radius: 8px;
-            width: 90%;
-            max-width: 400px;
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 20px;
         }
-        .scanner-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        #dataCaptureScheduleTab {
+            text-align: center;
+        }
+        #dataCaptureScheduleTab h1 {
+            text-align: left;
+        }
+        .result-item {
             margin-bottom: 15px;
         }
-        .close-button {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
+        /* QR Code Container Style */
+        .qr-code {
+            margin-top: 20px;
+            text-align: center;
         }
-        #scanner-container {
-            position: relative;
-            width: 100%;
-            height: 300px;
+        /* Description Text Style */
+        .qr-description {
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #333;
         }
-        #scanner-video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+.search-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.scan-button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.scan-button:hover {
+    background-color: #45a049;
+}
+
+.scanner-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+}
+
+.scanner-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 400px;
+}
+
+.scanner-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+#scanner-container {
+    position: relative;
+    width: 100%;
+    height: 300px;
+}
+
+#scanner-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+        /* Item Code Text Style */
+        .item-code {
+            margin-top: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        /* New Styles for Data Capture Schedule Tab */
+        .schedule-buttons {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column; /* Vertical alignment */
+            gap: 10px; /* Space between buttons */
+        }
+        .hidden {
+            display: none;
+        }
+        /* Duty Query Form Styles */
+        .duty-query-form {
+            background-color: #fff;
+            padding: 15px;
+            border: 1px solid #ddd;
             border-radius: 4px;
+            margin-top: 20px;
         }
+        .duty-query-form label {
+            margin-top: 10px;
+        }
+        /* Styles for Accordion */
+        details {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #fff;
+        }
+        summary {
+            font-weight: bold;
+            cursor: pointer;
+            position: relative;
+            padding-right: 20px;
+        }
+        /* Hide default markers */
+        summary::-webkit-details-marker {
+            display: none;
+        }
+        summary::marker {
+            display: none;
+        }
+        summary::after {
+            content: "▼";
+            position: absolute;
+            right: 0;
+            top: 0;
+            transition: transform 0.2s;
+        }
+        details[open] summary::after {
+            transform: rotate(-180deg);
+        }
+        /* Accordion Dropdown Styles */
+        .wardDropdown {
+            margin-top: 10px;
+        }
+        /* Responsive Tabs: Switch to vertical on small screens */
         @media (max-width: 600px) {
             .tabs {
                 flex-direction: column;
@@ -231,43 +409,57 @@
     <div id="binShelveTab" class="tab-content active container">
         <h1>Ward Stock Item Bin Shelve Checker</h1>
         <div id="binShelveUpdateInfo" class="update-info"></div>
-        <div id="itemPhqUpdateInfo" class="update-info"></div>
         <div id="productIdUpdateInfo" class="update-info"></div>
+        <div id="itemPhqUpdateInfo" class="update-info"></div>
         
         <div id="loading">Loading...</div>
         <div id="error" class="error"></div>
 
-        <div class="search-group">
-            <label for="wardSelect">Ward:</label>
-            <select id="wardSelect" onchange="onWardSelect()">
-                <option value="">Please select a ward</option>
-            </select>
-        </div>
+<div class="search-group">
+    <label for="wardSelect">Ward: <span class="required">*</span></label>
+    <select id="wardSelect">
+        <option value="">Please select a ward</option>
+    </select>
+</div>
 
-        <div class="search-group">
-            <label for="itemCodeFilter">Filter by Item Code:</label>
-            <div class="search-input-group">
-                <input type="text" id="itemCodeFilter" placeholder="Enter Item Code" oninput="filterItemCodes()">
-                <button id="scanButton" class="scan-button" onclick="startScanner()" disabled>
-                    Scan Barcode
-                </button>
-            </div>
-        </div>
+<!-- Item Code Filter -->
+<div class="search-group">
+    <label for="itemCodeFilter">Filter by Item Code:</label>
+    <div class="search-input-group">
+        <input type="text" 
+               id="itemCodeFilter" 
+               placeholder="Please select a ward first" 
+               disabled 
+               oninput="filterItemCodes()">
+        <button id="scanButton" 
+                class="scan-button" 
+                onclick="startScanner()" 
+                disabled>
+            Scan Barcode
+        </button>
+    </div>
+</div>
 
-        <!-- Scanner Modal -->
-        <div id="scannerModal" class="scanner-modal">
-            <div class="scanner-content">
-                <div class="scanner-header">
-                    <span>Scan Barcode</span>
-                    <button class="close-button" onclick="closeScanner()">&times;</button>
-                </div>
-                <div id="scanner-container">
-                    <video id="scanner-video" playsinline></video>
-                </div>
-            </div>
+<!-- Scanner Modal -->
+<div id="scannerModal" class="scanner-modal">
+    <div class="scanner-content">
+        <div class="scanner-header">
+            <span>Scan Barcode</span>
+            <button class="close-button" onclick="closeScanner()">&times;</button>
         </div>
+        <div id="scanner-container">
+            <video id="scanner-video" playsinline></video>
+            <div class="scanner-overlay"></div>
+            <div class="scanning-line"></div>
+        </div>
+    </div>
+</div>
         
+        <!-- Removed the Item Code Select and Search Button -->
+        <!-- The item codes will be displayed automatically upon ward selection -->
+
         <div id="result"></div>
+        <!-- QR Code Container -->
         <div id="qrCodeContainer" class="qr-code"></div>
     </div>
 
@@ -329,349 +521,886 @@
                         <option value="Friday">Friday</option>
                     </select>
                 </div>
+                <!-- Hidden Scanner Group -->
+                <div class="search-group hidden scanner-group">
+                    <label for="scannerTextbox">Scanner:</label>
+                    <input type="text" id="scannerTextbox" readonly>
+                </div>
                 <button onclick="performDutySearch()">Search</button>
                 <div id="dutyQueryResult"></div>
             </div>
         </div>
     </div>
 <script>
-// 全局變量
-let data = [];
-let cupboardData = [];
-let itemDescriptions = new Map();
+    let data = [];
+    let wards = new Set();
+    let cupboardData = [];
+    let cupboardWards = new Set();
+    let itemDescriptions = new Map();
 let productIdMap = new Map();
-let selectedTab = 'binShelve';
-let codeReader = null;
 
-// 文件加載和初始化
-window.onload = async function() {
-    const locationDate = await getFileLastUpdateDate('Location.xlsx');
-    const cupboardDate = await getFileLastUpdateDate('WardStockCupboard.xlsx');
-    const itemPhqDate = await getFileLastUpdateDate('item_phq.xlsx');
-    const productIdDate = await getFileLastUpdateDate('product_id.xlsx');
-    const dataCaptureDate = await getFileLastUpdateDate('Top_up_schedule_p1.png');
-    
-    document.getElementById('binShelveUpdateInfo').textContent = 
-        `Bin shelve information last updated on: ${locationDate}`;
-    document.getElementById('cupboardUpdateInfo').textContent = 
-        `Ward Stock Cupboard information last updated on: ${cupboardDate}`;
-    document.getElementById('itemPhqUpdateInfo').textContent = 
-        `Item_phq.xlsx last updated on: ${itemPhqDate}`;
-    document.getElementById('productIdUpdateInfo').textContent = 
-        `Product ID file last updated on: ${productIdDate}`;
-    document.getElementById('dataCaptureUpdateInfo').textContent = 
-        `Data Capture last updated on: ${dataCaptureDate}`;
-
-    await Promise.all([
-        loadDataFromGitHub(),
-        loadCupboardDataFromGitHub(),
-        loadItemDescriptions(),
-        loadProductIds(),
-        autoSelectWeekday()
-    ]);
-};
-
-// 檔案日期獲取
-async function getFileLastUpdateDate(filename) {
-    try {
-        const response = await fetch(`https://api.github.com/repos/AlexCheung109/WardStockLocationCheck/commits?path=${filename}&page=1&per_page=1`);
-        const data = await response.json();
-        if (data && data[0] && data[0].commit) {
-            const date = new Date(data[0].commit.committer.date);
-            return date.toLocaleDateString();
+    // Mapping for Duty and Weekday to Scanner
+    const dutyWeekdayScannerMap = {
+        "TP1-4": {
+            "Monday": "Scanner L",
+            "Tuesday": "Scanner M",
+            "Wednesday": "",
+            "Thursday": "Scanner M",
+            "Friday": "Scanner M"
+        },
+        "I11": {
+            "Monday": "Scanner N",
+            "Tuesday": "Scanner L",
+            "Wednesday": "Scanner L",
+            "Thursday": "Scanner L",
+            "Friday": "Scanner O"
+        },
+        "EA(I9)": {
+            "Monday": "",
+            "Tuesday": "",
+            "Wednesday": "",
+            "Thursday": "Scanner O",
+            "Friday": "Scanner L"
+        },
+        "P4(Main Store Member)": {
+            "Monday": "Scanner M",
+            "Tuesday": "Scanner N",
+            "Wednesday": "",
+            "Thursday": "Scanner N",
+            "Friday": "Scanner N"
         }
-        return 'Unknown';
-    } catch (error) {
-        console.error('Error fetching file date:', error);
-        return 'Unknown';
+    };
+
+    async function getFileLastUpdateDate(filename) {
+        try {
+            const response = await fetch(`https://api.github.com/repos/AlexCheung109/WardStockLocationCheck/commits?path=${filename}&page=1&per_page=1`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const dataResponse = await response.json();
+            if (dataResponse.length > 0) {
+                const date = new Date(dataResponse[0].commit.committer.date);
+                return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
+            }
+            return 'Date not available';
+        } catch (error) {
+            console.error('Error fetching file update date:', error);
+            return 'Date not available';
+        }
     }
-}
 
-// 加載 Excel 數據
-async function loadDataFromGitHub() {
-    try {
-        document.getElementById('loading').style.display = 'block';
-        document.getElementById('error').textContent = '';
-
-        const response = await fetch('https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Location.xlsx');
-        const arrayBuffer = await response.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        
-        data = XLSX.utils.sheet_to_json(worksheet);
-        
-        // 填充病房選擇下拉框
-        const wards = [...new Set(data.map(row => row.ward))].sort();
-        const wardSelects = document.querySelectorAll('#wardSelect, #cupboardWardSelect');
-        wardSelects.forEach(select => {
-            select.innerHTML = '<option value="">Please select a ward</option>';
-            wards.forEach(ward => {
-                const option = document.createElement('option');
-                option.value = ward;
-                option.textContent = ward;
-                select.appendChild(option);
+    async function loadItemDescriptions() {
+        try {
+            const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/item_phq.xlsx';
+            const response = await fetch(excelUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const arrayBuffer = await response.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const itemData = XLSX.utils.sheet_to_json(worksheet, {
+                header: ['itemCode', 'description'],
+                range: 0
             });
-        });
-    } catch (error) {
-        console.error('Error loading data:', error);
-        document.getElementById('error').textContent = 'Error loading data: ' + error.message;
-    } finally {
-        document.getElementById('loading').style.display = 'none';
+            itemDescriptions = new Map(
+                itemData.map(row => [row.itemCode.toString(), shortenDescription(row.description)])
+            );
+        } catch (error) {
+            console.error('Error loading item descriptions:', error);
+            document.getElementById('error').textContent = 'Error loading item descriptions: ' + error.message;
+        }
     }
-}
 
-// 加載 Cupboard 數據
-async function loadCupboardDataFromGitHub() {
-    try {
-        document.getElementById('cupboardLoading').style.display = 'block';
-        document.getElementById('cupboardError').textContent = '';
+    // Function to shorten descriptions while preserving meaning
+    function shortenDescription(description) {
+        // Simple example: truncate to 50 characters and add ellipsis
+        if (!description) return 'No description available';
+        if (description.length <= 50) return description;
+        return description.substring(0, 50) + '...';
+    }
 
-        const response = await fetch('https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/WardStockCupboard.xlsx');
-        const arrayBuffer = await response.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
+    window.onload = async function() {
+        const locationDate = await getFileLastUpdateDate('Location.xlsx');
+        const cupboardDate = await getFileLastUpdateDate('WardStockCupboard.xlsx');
+        const itemPhqDate = await getFileLastUpdateDate('item_phq.xlsx');
+        const dataCaptureDate = await getFileLastUpdateDate('Top_up_schedule_p1.png');
+        const productIdDate = await getFileLastUpdateDate('product_id.xlsx');
         
-        cupboardData = XLSX.utils.sheet_to_json(worksheet);
-    } catch (error) {
-        console.error('Error loading cupboard data:', error);
-        document.getElementById('cupboardError').textContent = 'Error loading cupboard data: ' + error.message;
-    } finally {
-        document.getElementById('cupboardLoading').style.display = 'none';
-    }
-}
+        document.getElementById('binShelveUpdateInfo').textContent = 
+            `Bin shelve information last updated on: ${locationDate}`;
+        document.getElementById('cupboardUpdateInfo').textContent = 
+            `Ward Stock Cupboard information last updated on: ${cupboardDate}`;
+        document.getElementById('itemPhqUpdateInfo').textContent = 
+            `Item_phq.xlsx last updated on: ${itemPhqDate}`;
+        document.getElementById('dataCaptureUpdateInfo').textContent = 
+            `Data Capture last updated on: ${dataCaptureDate}`;
+        document.getElementById('productIdUpdateInfo').textContent = // 新增這行
+        `Product ID mapping last updated on: ${productIdDate}`; // 新增這行
 
-// 加載物品描述
-async function loadItemDescriptions() {
-    try {
-        const response = await fetch('https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/item_phq.xlsx');
-        const arrayBuffer = await response.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        
-        const itemData = XLSX.utils.sheet_to_json(worksheet, {
-            header: ['itemCode', 'description']
+        await Promise.all([
+            loadDataFromGitHub(),
+            loadCupboardDataFromGitHub(),
+            loadItemDescriptions(),
+            loadProductIds(),
+            autoSelectWeekday()
+        ]);
+    };
+
+    function switchTab(tabId, button) {
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        document.querySelectorAll('.tab-button').forEach(btn => {
+            btn.classList.remove('active');
         });
 
-        itemDescriptions = new Map(
-            itemData.map(row => [row.itemCode.toString(), row.description])
-        );
-    } catch (error) {
-        console.error('Error loading item descriptions:', error);
+        document.getElementById(tabId + 'Tab').classList.add('active');
+        button.classList.add('active');
     }
-}
-
-// 加載產品ID
 async function loadProductIds() {
     try {
-        const response = await fetch('https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Product_ID.xlsx');
+        const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Product_ID.xlsx';
+        const response = await fetch(excelUrl);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const arrayBuffer = await response.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         
         const productData = XLSX.utils.sheet_to_json(worksheet, {
-            header: ['itemCode', 'productId']
+            header: ['itemCode', 'productId'],
+            range: 1
         });
 
-        productIdMap = new Map(
-            productData.map(row => [row.productId.toString(), row.itemCode.toString()])
-        );
+        // 清空當前的 Map
+        productIdMap.clear();
+        
+        // 將 productId 作為 key，itemCode 作為 value 存入 Map
+        productData.forEach(row => {
+            if (row.productId && row.itemCode) {
+                productIdMap.set(row.productId.toString().trim(), row.itemCode.toString().trim());
+            }
+        });
+        
+        console.log('Product ID mapping loaded:', productIdMap.size, 'entries');
+        
     } catch (error) {
         console.error('Error loading product IDs:', error);
+        document.getElementById('error').textContent = 'Error loading product IDs: ' + error.message;
     }
 }
 
-// Tab 切換功能
-function switchTab(tabId, button) {
-    // 更新按鈕樣式
-    document.querySelectorAll('.tab-button').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    button.classList.add('active');
+    async function loadDataFromGitHub() {
+        const loading = document.getElementById('loading');
+        loading.style.display = 'block';
 
-    // 更新內容顯示
-    document.querySelectorAll('.tab-content').forEach(content => {
-        content.classList.remove('active');
-    });
-    document.getElementById(tabId + 'Tab').classList.add('active');
-    selectedTab = tabId;
+        try {
+            const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Location.xlsx';
+            const response = await fetch(excelUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
-    // 重置掃描器
-    if (codeReader && tabId !== 'binShelve') {
-        codeReader.reset();
-        closeScanner();
-    }
-}
+            const arrayBuffer = await response.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            
+            data = XLSX.utils.sheet_to_json(worksheet, {
+                header: ['ward', 'itemCode', 'c', 'd', 'e', 'f', 'location'],
+                range: 1
+            });
 
-// 病房選擇處理
-function onWardSelect() {
-    const wardSelect = document.getElementById('wardSelect');
-    document.getElementById('itemCodeFilter').value = '';
-    document.getElementById('result').innerHTML = '';
-    document.getElementById('scanButton').disabled = !wardSelect.value;
-}
+            data = data.map(row => ({
+                ward: row.ward,
+                itemCode: row.itemCode,
+                location: row.location
+            }));
 
-// 物品代碼過濾
-function filterItemCodes() {
-    const ward = document.getElementById('wardSelect').value;
-    if (!ward) {
-        document.getElementById('result').innerHTML = 'Please select a ward first.';
-        return;
-    }
-
-    const filterText = document.getElementById('itemCodeFilter').value.trim().toUpperCase();
-    if (!filterText) {
-        document.getElementById('result').innerHTML = '';
-        return;
+            wards = new Set(data.map(row => row.ward));
+            updateWardSelect();
+            
+            loading.style.display = 'none';
+        } catch (error) {
+            console.error('Error loading data:', error);
+            loading.style.display = 'none';
+            document.getElementById('error').textContent = 'Error loading data: ' + error.message;
+        }
     }
 
-    // 檢查是否為產品ID
-    const itemCode = productIdMap.get(filterText) || filterText;
+    async function loadCupboardDataFromGitHub() {
+        const loading = document.getElementById('cupboardLoading');
+        loading.style.display = 'block';
+
+        try {
+            const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/WardStockCupboard.xlsx';
+            const response = await fetch(excelUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const arrayBuffer = await response.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            
+            // Modify headers to include Weekday columns (Assuming columns B-F correspond to MON-FRI)
+            cupboardData = XLSX.utils.sheet_to_json(worksheet, {
+                header: ['ward', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'ignore1', 'wardStockCupboardLocation', 'fridgeLocation', 'concentratedElectrolyteCupboardLocation', 'remark'],
+                range: 1
+            });
+
+            cupboardData = cupboardData.map(row => ({
+                ward: row.ward ? row.ward.toString().trim() : '',
+                MON: row.MON ? row.MON.toString().trim() : '',
+                TUE: row.TUE ? row.TUE.toString().trim() : '',
+                WED: row.WED ? row.WED.toString().trim() : '',
+                THU: row.THU ? row.THU.toString().trim() : '',
+                FRI: row.FRI ? row.FRI.toString().trim() : '',
+                wardStockCupboardLocation: row.wardStockCupboardLocation ? row.wardStockCupboardLocation.toString().trim() : '',
+                fridgeLocation: row.fridgeLocation ? row.fridgeLocation.toString().trim() : '',
+                concentratedElectrolyteCupboardLocation: row.concentratedElectrolyteCupboardLocation ? row.concentratedElectrolyteCupboardLocation.toString().trim() : '',
+                remark: row.remark ? row.remark.toString().trim() : ''
+            }));
+
+            cupboardWards = new Set(cupboardData.map(row => row.ward));
+            updateCupboardWardSelect();
+            
+            loading.style.display = 'none';
+        } catch (error) {
+            console.error('Error loading cupboard data:', error);
+            loading.style.display = 'none';
+            document.getElementById('cupboardError').textContent = 'Error loading cupboard data: ' + error.message;
+        }
+    }
+
+    function updateCupboardWardSelect() {
+        const select = document.getElementById('cupboardWardSelect');
+        select.innerHTML = '<option value="">Please select a ward</option>';
+        
+        Array.from(cupboardWards).sort(sortWardsDesc).forEach(ward => {
+            const option = document.createElement('option');
+            option.value = ward;
+            option.textContent = ward;
+            select.appendChild(option);
+        });
+    }
+
+    function searchCupboard() {
+        const selectedWard = document.getElementById('cupboardWardSelect').value;
+        const resultDiv = document.getElementById('cupboardResult');
+
+        if (!selectedWard) {
+            resultDiv.innerHTML = 'Please select a ward';
+            return;
+        }
+
+        const found = cupboardData.find(row => row.ward === selectedWard);
+
+        if (found) {
+            let resultHTML = `
+                <p class="ward-title">Ward: ${found.ward}</p>
+                <p class="location-label">Ward Stock Cupboard Location:</p>
+                <p class="location-value">${found.wardStockCupboardLocation || 'N/A'}</p>
+                <p class="location-label">Fridge Location:</p>
+                <p class="location-value">${found.fridgeLocation || 'N/A'}</p>
+                <p class="location-label">Concentrated Electrolyte Cupboard Location:</p>
+                <p class="location-value">${found.concentratedElectrolyteCupboardLocation || 'N/A'}</p>
+            `;
+
+            // Add Remark section if available
+            if (found.remark && found.remark.trim() !== '') {
+                resultHTML += `
+                    <p class="location-label">Remark:</p>
+                    <p class="location-value">${found.remark}</p>
+                `;
+            }
+
+            resultDiv.innerHTML = resultHTML;
+        } else {
+            resultDiv.innerHTML = 'No cupboard information found for this ward';
+        }
+    }
+
+// 找到 updateWardSelect 函數，修改如下：
+function updateWardSelect() {
+    const select = document.getElementById('wardSelect');
+    select.innerHTML = '<option value="">Please select a ward</option>';
     
-    const filteredData = data.filter(row => 
-        row.ward === ward && 
-        row.item_code.toString().includes(itemCode)
-    );
-
-    displayResults(filteredData, itemCode);
-}
-
-// 顯示搜索結果
-function displayResults(filteredData, searchText) {
-    const resultDiv = document.getElementById('result');
-    if (filteredData.length === 0) {
-        resultDiv.innerHTML = `No results found for "${searchText}"`;
-        return;
-    }
-
-    let html = '';
-    filteredData.forEach(row => {
-        const description = itemDescriptions.get(row.item_code.toString()) || 'No description available';
-        html += `
-            <div class="ward-title">${row.ward}</div>
-            <div class="item-description">
-                Item Code: ${row.item_code}<br>
-                Description: ${description}
-            </div>
-            <div class="location-label">Location:</div>
-            <div class="location-text">${row.location || 'Location not specified'}</div>
-            <hr>
-        `;
+    Array.from(wards).sort(sortWardsDesc).forEach(ward => {
+        const option = document.createElement('option');
+        option.value = ward;
+        option.textContent = ward;
+        select.appendChild(option);
     });
-    resultDiv.innerHTML = html;
+
+    // 添加 onchange 事件監聽器
+    select.onchange = handleWardSelection;
+
+// 添加新的函數來處理 ward 選擇
+function handleWardSelection() {
+    const selectedWard = document.getElementById('wardSelect').value;
+    const itemCodeFilter = document.getElementById('itemCodeFilter');
+    const scanButton = document.getElementById('scanButton');
+    
+    if (selectedWard) {
+        // 啟用 item code filter 和 scan button
+        itemCodeFilter.disabled = false;
+        scanButton.disabled = false;
+        itemCodeFilter.placeholder = "Enter Item Code";
+        displayItemCodes(); // 顯示該病房的 item codes
+    } else {
+        // 禁用 item code filter 和 scan button
+        itemCodeFilter.disabled = true;
+        scanButton.disabled = true;
+        itemCodeFilter.placeholder = "Please select a ward first";
+        itemCodeFilter.value = ''; // 清空輸入
+        document.getElementById('result').innerHTML = ''; // 清空結果
+    }
 }
+    }
 
-// Cupboard 搜索功能
-function searchCupboard() {
-    const ward = document.getElementById('cupboardWardSelect').value;
-    const resultDiv = document.getElementById('cupboardResult');
+    // Helper function to parse ward into letters, number, and suffix
+    function parseWard(ward) {
+        const match = ward.match(/^([A-Za-z]+)(\d+)(.*)$/);
+        if (match) {
+            const letters = match[1].toUpperCase();
+            const number = parseInt(match[2], 10);
+            const suffix = match[3].toUpperCase();
+            return { letters, number, suffix };
+        }
+        return { letters: '', number: 0, suffix: '' };
+    }
 
-    if (!ward) {
-        resultDiv.innerHTML = 'Please select a ward.';
+    // Custom sort function: first by number descending, then by letters ascending
+    function sortWardsDesc(a, b) {
+        const wa = parseWard(a);
+        const wb = parseWard(b);
+
+        // Sort by number descending
+        if (wa.number > wb.number) return -1;
+        if (wa.number < wb.number) return 1;
+
+        // Then sort by letters ascending
+        if (wa.letters < wb.letters) return -1;
+        if (wa.letters > wb.letters) return 1;
+
+        // Finally, sort by suffix ascending
+        if (wa.suffix < wb.suffix) return -1;
+        if (wa.suffix > wb.suffix) return 1;
+
+        return 0;
+    }
+
+    // Function to display item codes as clickable accordions
+    function displayItemCodes() {
+        const selectedWard = document.getElementById('wardSelect').value;
+        const resultDiv = document.getElementById('result');
+
+        // Clear previous results
+        resultDiv.innerHTML = '';
+        document.getElementById('qrCodeContainer').innerHTML = '';
+
+        if (!selectedWard) {
+            resultDiv.innerHTML = 'Please select a ward';
+            return;
+        }
+
+        // Fetch all item codes for the selected ward
+        const wardItems = data
+            .filter(row => row.ward === selectedWard)
+            .map(row => row.itemCode)
+            .filter(itemCode => itemCode) // Remove empty item codes
+            .sort(); // Sort A-Z
+
+        if (wardItems.length > 0) {
+            // Remove duplicates
+            const uniqueItemCodes = [...new Set(wardItems)];
+
+            // Sort unique item codes A-Z
+            uniqueItemCodes.sort();
+
+            // Create accordion-style details elements
+            let itemListHTML = `<h3>Item Codes in Ward ${selectedWard}:</h3>`;
+            uniqueItemCodes.forEach(itemCode => {
+                const found = data.find(row => row.ward === selectedWard && row.itemCode.toString() === itemCode.toString());
+                if (found) {
+                    itemListHTML += `
+                        <details>
+                            <summary>${itemCode}</summary>
+                            <div class="wardDropdown">
+                                <p class="ward-title">Ward: ${found.ward}</p>
+                                <p class="location-label">Item Code:</p>
+                                <p class="location-value">${found.itemCode}</p>
+                                <p class="location-label">Item Description:</p>
+                                <p class="item-description">${itemDescriptions.get(found.itemCode) || 'No description available'}</p>
+                                <p class="location-label">Location:</p>
+                                <p class="location-value">${found.location || 'N/A'}</p>
+                                
+                                <!-- 新增的描述和 QR Code 區塊 -->
+                                ${ ( (selectedWard.toUpperCase() === 'B6' || selectedWard.toUpperCase() === 'D6') && 
+                                     (found.location.startsWith('***E') || found.location.startsWith('**E')) ) ? `
+                                    <p class="location-label">Description:</p>
+                                    <p class="location-value">Scan it to open the drug locker directly.</p>
+                                    
+                                    <div class="qr-code">
+                                        <canvas id="qr-${itemCode}"></canvas>
+                                        <p class="item-code">Item Code: ${itemCode}</p>
+                                    </div>
+                                ` : ''}
+                                
+                            </div>
+                        </details>
+                    `;
+                }
+            });
+            resultDiv.innerHTML = itemListHTML;
+
+            // Enforce single-open accordion behavior
+            document.querySelectorAll('#result details').forEach(details => {
+                details.addEventListener('toggle', function() {
+                    if (this.open) {
+                        document.querySelectorAll('#result details').forEach(d => {
+                            if (d !== this) d.open = false;
+                        });
+                    }
+                });
+            });
+
+            // 生成 QR Code
+            generateQRCodes(selectedWard, uniqueItemCodes);
+        } else {
+            resultDiv.innerHTML = 'No item codes found for this ward';
+        }
+    }
+
+    // 新增的函數，用於生成 QR Code
+    function generateQRCodes(selectedWard, uniqueItemCodes) {
+        uniqueItemCodes.forEach(itemCode => {
+            const found = data.find(row => row.ward === selectedWard && row.itemCode.toString() === itemCode.toString());
+            if (found && (selectedWard.toUpperCase() === 'B6' || selectedWard.toUpperCase() === 'D6') && 
+                (found.location.startsWith('***E') || found.location.startsWith('**E'))) {
+                const qrCanvas = document.getElementById(`qr-${itemCode}`);
+                if (qrCanvas) {
+                    // 使用 QRious 生成 QR Code
+                    new QRious({
+                        element: qrCanvas,
+                        value: itemCode.toString(),
+                        size: 150
+                    });
+                }
+            }
+        });
+    }
+
+    // Function to filter item codes based on input
+    function filterItemCodes() {
+        const filterValue = document.getElementById('itemCodeFilter').value.toLowerCase();
+        const detailsElements = document.querySelectorAll('#result details');
+
+        detailsElements.forEach(details => {
+            const summary = details.querySelector('summary').textContent.toLowerCase();
+            if (summary.includes(filterValue)) {
+                details.style.display = '';
+            } else {
+                details.style.display = 'none';
+            }
+        });
+    }
+
+    function searchLocation() {
+        const selectedWard = document.getElementById('wardSelect').value;
+        const selectedItemCode = document.getElementById('itemCodeSelect').value;
+        const resultDiv = document.getElementById('result');
+        const qrCodeContainer = document.getElementById('qrCodeContainer');
+
+        // Clear previous QR code and descriptions
+        qrCodeContainer.innerHTML = '';
+
+        if (!selectedWard || !selectedItemCode) {
+            resultDiv.innerHTML = 'Please select both ward and item code';
+            return;
+        }
+
+        const found = data.find(row => 
+            row.ward === selectedWard && 
+            row.itemCode.toString() === selectedItemCode
+        );
+
+        if (found) {
+            const itemDescription = itemDescriptions.get(selectedItemCode) || 'No description available';
+            resultDiv.innerHTML = `
+                <h3>Search Result:</h3>
+                <div class="result-item">
+                    <strong>Ward:</strong> ${found.ward}
+                </div>
+                <div class="result-item">
+                    <strong>Item Code:</strong> ${found.itemCode}
+                </div>
+                <div class="result-item">
+                    <strong>Item Description:</strong><br>
+                    <span class="item-description">${itemDescription}</span>
+                </div>
+                <div class="result-item">
+                    <strong>Location:</strong><br>
+                    <span class="location-text">${found.location}</span>
+                </div>
+            `;
+
+            // Check if selected ward is B6 or D6 AND location starts with '***E'
+            if ((selectedWard.toUpperCase() === 'B6' || selectedWard.toUpperCase() === 'D6') && found.location.startsWith('***E')) {
+                // Create description text above QR code
+                const description = document.createElement('p');
+                description.className = 'qr-description';
+                description.textContent = 'Scan it to open the drug locker directly.';
+
+                // Append description to QR code container
+                qrCodeContainer.appendChild(description);
+
+                // Generate QR code
+                const qr = new QRious({
+                    value: selectedItemCode,
+                    size: 150
+                });
+
+                // Create an <img> element to display the QR code
+                const img = document.createElement('img');
+                img.src = qr.toDataURL();
+                img.alt = `QR Code for Item Code ${selectedItemCode}`;
+                img.style.marginTop = '10px';
+                img.style.width = '150px';
+                img.style.height = '150px';
+                img.style.display = 'block';
+                img.style.marginLeft = 'auto';
+                img.style.marginRight = 'auto';
+
+                // Append QR code image to container
+                qrCodeContainer.appendChild(img);
+
+                // Create Item Code text below QR code
+                const itemCodeText = document.createElement('p');
+                itemCodeText.className = 'item-code';
+                itemCodeText.textContent = `Item Code: ${selectedItemCode}`;
+
+                // Append Item Code text to container
+                qrCodeContainer.appendChild(itemCodeText);
+            }
+        } else {
+            resultDiv.innerHTML = 'No matching records found';
+        }
+    }
+
+    // Functions to handle Data Capture Schedule Tab
+    function showFullSchedule() {
+        document.getElementById('fullSchedule').style.display = 'block';
+        document.getElementById('dutyQuery').style.display = 'none';
+    }
+
+    function showDutyQuery() {
+        document.getElementById('dutyQuery').style.display = 'block';
+        document.getElementById('fullSchedule').style.display = 'none';
+    }
+
+    function performDutySearch() {
+        const dutySelect = document.getElementById('dutySelect').value;
+        const weekdaySelect = document.getElementById('weekdaySelect').value;
+        const scannerTextbox = document.getElementById('scannerTextbox');
+        const resultDiv = document.getElementById('dutyQueryResult');
+
+        // Clear previous results
+        scannerTextbox.value = '';
+        resultDiv.innerHTML = '';
+
+        if (!dutySelect || !weekdaySelect) {
+            alert('Please select both Duty and Weekday.');
+            return;
+        }
+
+        const scanner = dutyWeekdayScannerMap[dutySelect][weekdaySelect];
+        
+        if (!scanner) {
+            scannerTextbox.value = 'No Scanner Assigned';
+            resultDiv.innerHTML = 'No Scanner assigned for the selected Duty and Weekday.';
+            return;
+        }
+
+        scannerTextbox.value = scanner;
+
+        // Determine the column to search based on Weekday
+        const weekdayColumnMap = {
+            "Monday": "MON",
+            "Tuesday": "TUE",
+            "Wednesday": "WED",
+            "Thursday": "THU",
+            "Friday": "FRI"
+        };
+
+        const column = weekdayColumnMap[weekdaySelect];
+        if (!column) {
+            resultDiv.innerHTML = 'Invalid Weekday selected.';
+            return;
+        }
+
+        // Use full Scanner string (e.g., "Scanner M")
+        const scannerUpper = scanner.toUpperCase();
+
+        // Search in cupboardData for wards where the specified column has the scanner
+        const matchedWards = cupboardData
+            .filter(row => row[column] && row[column].toUpperCase() === scannerUpper)
+            .map(row => row.ward)
+            .filter(ward => ward) // Remove empty wards
+            .sort(sortWardsDesc);
+
+        if (matchedWards.length > 0) {
+            // Remove duplicates
+            const uniqueWards = [...new Set(matchedWards)];
+            // Apply custom sort
+            uniqueWards.sort(sortWardsDesc);
+            // Create accordion-style details elements
+            let wardListHTML = `<h3>Wards with ${scanner} on ${weekdaySelect}:</h3>`;
+            uniqueWards.forEach(ward => {
+                const found = cupboardData.find(row => row.ward === ward);
+                if (found) {
+                    wardListHTML += `
+                        <details>
+                            <summary>${ward}</summary>
+                            <div class="wardDropdown">
+                                <p class="ward-title">Ward: ${found.ward}</p>
+                                <p class="location-label">Ward Stock Cupboard Location:</p>
+                                <p class="location-value">${found.wardStockCupboardLocation || 'N/A'}</p>
+                                <p class="location-label">Fridge Location:</p>
+                                <p class="location-value">${found.fridgeLocation || 'N/A'}</p>
+                                <p class="location-label">Concentrated Electrolyte Cupboard Location:</p>
+                                <p class="location-value">${found.concentratedElectrolyteCupboardLocation || 'N/A'}</p>
+                                ${found.remark && found.remark.trim() !== '' ? `
+                                    <p class="location-label">Remark:</p>
+                                    <p class="location-value">${found.remark}</p>
+                                ` : ''}
+                            </div>
+                        </details>
+                    `;
+                }
+            });
+            resultDiv.innerHTML = wardListHTML;
+
+            // Enforce single-open accordion behavior
+            document.querySelectorAll('#dutyQueryResult details').forEach(details => {
+                details.addEventListener('toggle', function() {
+                    if (this.open) {
+                        document.querySelectorAll('#dutyQueryResult details').forEach(d => {
+                            if (d !== this) d.open = false;
+                        });
+                    }
+                });
+            });
+        } else {
+            resultDiv.innerHTML = `No wards found with ${scanner} on ${weekdaySelect}.`;
+        }
+    }
+
+    // Function to auto-select the current weekday
+    async function autoSelectWeekday() {
+        const currentDate = new Date();
+        const weekdayNumber = currentDate.getDay(); // Sunday - Saturday : 0 - 6
+        const weekdayMap = {
+            1: "Monday",
+            2: "Tuesday",
+            3: "Wednesday",
+            4: "Thursday",
+            5: "Friday",
+            6: "Saturday",
+            0: "Sunday"
+        };
+        const currentWeekday = weekdayMap[weekdayNumber] || "Monday";
+        document.getElementById('weekdaySelect').value = currentWeekday;
+    }
+
+let codeReader;
+
+function startScanner() {
+    const selectedWard = document.getElementById('wardSelect').value;
+    if (!selectedWard) {
+        alert('Please select a ward first');
         return;
     }
 
-    const wardData = cupboardData.filter(row => row.ward === ward);
-    if (wardData.length === 0) {
-        resultDiv.innerHTML = 'No cupboard data found for this ward.';
-        return;
+    const modal = document.getElementById('scannerModal');
+    const video = document.getElementById('scanner-video');
+    modal.style.display = 'block';
+    
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: "environment"
+            } 
+        })
+        .then(function(stream) {
+            video.srcObject = stream;
+            video.setAttribute('playsinline', true);
+            video.play();
+            scanning = true;
+            scanBarcodes();
+        })
+        .catch(function(error) {
+            console.error("Camera error: ", error);
+            alert("Error accessing camera. Please make sure you have granted camera permissions.");
+        });
     }
-
-    let html = `<h2>${ward} Cupboard Locations</h2>`;
-    wardData.forEach(row => {
-        html += `
-            <div class="location-label">Cupboard Number:</div>
-            <div class="location-value">${row.cupboard_no || 'Not specified'}</div>
-            <div class="location-label">Location:</div>
-            <div class="location-value">${row.location || 'Not specified'}</div>
-            <hr>
-        `;
-    });
-    resultDiv.innerHTML = html;
 }
 
-// 條碼掃描功能
-async function startScanner() {
+function scanBarcodes() {
+    const video = document.getElementById('scanner-video');
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+
+    async function tick() {
+        if (!scanning) return;
+
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.height = video.videoHeight;
+            canvas.width = video.videoWidth;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            try {
+                // 1. 快速掃描 QR Code
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+                if (qrResult) {
+                    console.log('QR Code found:', qrResult.data);
+                    // 直接處理 QR Code
+                    const drugMatch = qrResult.data.match(/<F>(.*?)<\/F>/);
+                    if (drugMatch) {
+                        handleItemCode(drugMatch[1]);
+                        return;
+                    }
+                }
+
+                // 2. 快速掃描一維碼和 DataMatrix
+                const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+                const reader = new ZXing.MultiFormatReader();
+                
+                const hints = new Map();
+                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                    ZXing.BarcodeFormat.DATA_MATRIX,
+                    ZXing.BarcodeFormat.EAN_13,
+                    ZXing.BarcodeFormat.CODE_128
+                ]);
+                
+                const result = reader.decode(binaryBitmap, hints);
+                if (result) {
+                    const scannedText = result.text;
+                    console.log('Barcode found:', scannedText);
+                    
+                    // 檢查是否是純數字（一維碼）
+                    if (/^\d+$/.test(scannedText)) {
+                        handleItemCode(scannedText);
+                        return;
+                    }
+                    
+                    // 如果不是純數字，可能是 DataMatrix
+                    // 顯示 loading 並進行詳細分析
+                    showLoading();
+                    handleDataMatrix(scannedText);
+                    return;
+                }
+            } catch (error) {
+                // 繼續掃描
+            }
+        }
+        requestAnimationFrame(tick);
+    }
+
+    tick();
+}
+
+
+
+function closeScanner() {
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
     
-    modal.style.display = 'block';
-    
-    if (!codeReader) {
-        codeReader = new ZXing.BrowserMultiFormatReader();
-    }
-
-    try {
-        await codeReader.decodeFromVideoDevice(null, video, (result, err) => {
-            if (result) {
-                const scannedCode = result.getText();
-                document.getElementById('itemCodeFilter').value = scannedCode;
-                filterItemCodes();
-                closeScanner();
-            }
-        });
-    } catch (err) {
-        console.error(err);
-        alert('Error accessing camera: ' + err.message);
-        closeScanner();
-    }
-}
-
-// 關閉掃描器
-function closeScanner() {
-    const modal = document.getElementById('scannerModal');
+    scanning = false;
     modal.style.display = 'none';
+    
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+    }
+    
     if (codeReader) {
         codeReader.reset();
     }
 }
 
-// 自動選擇當前星期
-function autoSelectWeekday() {
-    const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const today = new Date().getDay();
-    if (today > 0 && today < 6) { // 只在週一到週五自動選擇
-        const weekdaySelect = document.getElementById('weekdaySelect');
-        if (weekdaySelect) {
-            weekdaySelect.value = weekdays[today];
-        }
+
+// 顯示 Loading
+function showLoading() {
+    const modal = document.createElement('div');
+    modal.id = 'loadingModal';
+    modal.innerHTML = `
+        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white p-4 rounded-lg shadow-lg text-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+                <p class="mt-2">分析條碼中...</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+// 隱藏 Loading
+function hideLoading() {
+    const modal = document.getElementById('loadingModal');
+    if (modal) {
+        modal.remove();
     }
 }
 
-// 工作查詢功能
-function performDutySearch() {
-    const duty = document.getElementById('dutySelect').value;
-    const weekday = document.getElementById('weekdaySelect').value;
-    const resultDiv = document.getElementById('dutyQueryResult');
+// 處理 DataMatrix
+async function handleDataMatrix(scannedText) {
+    try {
+        // 在這裡進行 DataMatrix 的詳細分析
+        const gtinMatch = scannedText.match(/GTIN[:\s]*(\d+)/i);
+        if (gtinMatch) {
+            const gtin = gtinMatch[1];
+            const itemCode = productIdMap.get(gtin);
+            
+            if (itemCode) {
+                handleItemCode(itemCode);
+            } else {
+                alert(`無法找到此 GTIN (${gtin}) 對應的 item code`);
+            }
+        } else {
+            alert('無法識別的 DataMatrix 格式');
+        }
+    } catch (error) {
+        console.error('DataMatrix 分析錯誤:', error);
+        alert('分析條碼時發生錯誤');
+    } finally {
+        hideLoading();
+        closeScanner();
+    }
+}
 
-    if (!duty || !weekday) {
-        resultDiv.innerHTML = 'Please select both duty and weekday.';
+function handleItemCode(itemCode) {
+    const selectedWard = document.getElementById('wardSelect').value;
+    if (!selectedWard) {
+        alert('Please select a ward first');
+        closeScanner();
         return;
     }
 
-    // 這裡可以添加具體的工作查詢邏輯
-    // 目前僅顯示選擇的值
-    resultDiv.innerHTML = `
-        <h3>Search Results:</h3>
-        <p>Duty: ${duty}</p>
-        <p>Weekday: ${weekday}</p>
-    `;
+    console.log('處理 item code:', itemCode);
+    document.getElementById('itemCodeFilter').value = itemCode;
+    filterItemCodes();
+    closeScanner();
 }
 
-// 顯示完整排程
-function showFullSchedule() {
-    document.getElementById('fullSchedule').style.display = 'block';
-    document.getElementById('dutyQuery').style.display = 'none';
-}
-
-// 顯示工作查詢
-function showDutyQuery() {
-    document.getElementById('fullSchedule').style.display = 'none';
-    document.getElementById('dutyQuery').style.display = 'block';
-}
 </script>
 </body>
 </html>
