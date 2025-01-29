@@ -696,58 +696,38 @@ function switchTab(tabId, button) {
 
 async function loadProductIds() {
     try {
-        // 检查本地缓存
-        const cachedData = localStorage.getItem('ProductIDData');
-        const lastUpdate = localStorage.getItem('ProductIDLastUpdate');
-        const currentTime = new Date().getTime();
-
-        // 如果缓存存在且在一周内（根据需要调整）
-        if (cachedData && lastUpdate && (currentTime - lastUpdate) < 7 * 24 * 60 * 60 * 1000) {
-            const productData = JSON.parse(cachedData);
-            productIdMap.clear();
-            productData.forEach(row => {
-                if (row.productId && row.itemCode) {
-                    productIdMap.set(row.productId.toString().trim(), row.itemCode.toString().trim());
-                }
-            });
-            console.log('Product ID mapping loaded from cache:', productIdMap.size, 'entries');
-        } else {
-            // 如果没有缓存或缓存过期，重新从网络加载
-            const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Product_ID.xlsx';
-            const response = await fetch(excelUrl);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const arrayBuffer = await response.arrayBuffer();
-            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-
-            const productData = XLSX.utils.sheet_to_json(worksheet, {
-                header: ['itemCode', 'productId'],
-                range: 1
-            });
-
-            // 存储到缓存
-            localStorage.setItem('ProductIDData', JSON.stringify(productData));
-            localStorage.setItem('ProductIDLastUpdate', currentTime);
-
-            // 加载数据到 Map
-            productIdMap.clear();
-            productData.forEach(row => {
-                if (row.productId && row.itemCode) {
-                    productIdMap.set(row.productId.toString().trim(), row.itemCode.toString().trim());
-                }
-            });
-            console.log('Product ID mapping loaded from network:', productIdMap.size, 'entries');
+        const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Product_ID.xlsx';
+        const response = await fetch(excelUrl);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        const productData = XLSX.utils.sheet_to_json(worksheet, {
+            header: ['itemCode', 'productId'],
+            range: 1
+        });
+
+        productIdMap.clear();
+        let count = 0;
+        productData.forEach(row => {
+            if (row.productId && row.itemCode) {
+                productIdMap.set(row.productId.toString().trim(), row.itemCode.toString().trim());
+                count++;
+            }
+        });
+        console.log(`已載入 ${count} 個產品映射`);
+        console.log('映射示例:', Array.from(productIdMap.entries()).slice(0, 5));
+
     } catch (error) {
-        console.error('Error loading product IDs:', error);
-        document.getElementById('error').textContent = 'Error loading product IDs: ' + error.message;
+        console.error('載入產品ID時出錯:', error);
+        alert('載入產品資料時出錯，請重新整理頁面');
     }
 }
-
 function normalizeBarcode(text) {
     return text.toString().trim().toUpperCase();
 }
@@ -1309,18 +1289,20 @@ async function startScanner() {
 
         // 嘗試獲取相機權限
         console.log('請求相機權限...');
-        const constraints = {
-            video: {
-                facingMode: "environment",
-                width: { ideal: 1920 },
-                height: { ideal: 1080 },
-                focusMode: "continuous",
-                advanced: [{
-                    focusMode: "continuous",
-                    autoFocus: true
-                }]
-            }
-        };
+const constraints = {
+    video: {
+        facingMode: "environment",
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        focusMode: "continuous",
+        advanced: [{
+            focusMode: "continuous",
+            autoFocus: true,
+            exposureMode: "continuous",
+            whiteBalanceMode: "continuous"
+        }]
+    }
+};
 
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         console.log('相機權限獲取成功');
@@ -1389,19 +1371,9 @@ async function scanBarcodes() {
         if (!scanning) return;
 
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            // 增加解析度和清晰度
             canvas.height = video.videoHeight;
             canvas.width = video.videoWidth;
             
-            // 擴大掃描區域
-            const scanRegion = {
-                x: canvas.width * 0.1,
-                y: canvas.height * 0.1,
-                width: canvas.width * 0.8,
-                height: canvas.height * 0.8
-            };
-
-            // 繪製完整圖像
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
             const currentTime = Date.now();
@@ -1412,87 +1384,47 @@ async function scanBarcodes() {
             lastCheck = currentTime;
 
             try {
-                // 1. 一維碼和 Data Matrix 處理
+                // 一維碼和 Data Matrix 處理
                 try {
-                    // 創建多個掃描區域
-                    const regions = [
-                        // 中心區域
-                        {x: canvas.width * 0.3, y: canvas.height * 0.3, w: canvas.width * 0.4, h: canvas.height * 0.4},
-                        // 左側區域
-                        {x: canvas.width * 0.1, y: canvas.height * 0.2, w: canvas.width * 0.3, h: canvas.height * 0.6},
-                        // 右側區域
-                        {x: canvas.width * 0.6, y: canvas.height * 0.2, w: canvas.width * 0.3, h: canvas.height * 0.6}
-                    ];
-
-                    for (const region of regions) {
-                        // 為每個區域創建單獨的 canvas
-                        const regionCanvas = document.createElement('canvas');
-                        regionCanvas.width = region.w;
-                        regionCanvas.height = region.h;
-                        const regionCtx = regionCanvas.getContext('2d');
-                        
-                        // 從主 canvas 複製區域圖像
-                        regionCtx.drawImage(canvas, 
-                            region.x, region.y, region.w, region.h,
-                            0, 0, region.w, region.h
-                        );
-
-                        const source = new ZXing.HTMLCanvasElementLuminanceSource(regionCanvas);
-                        const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
-                        const reader = new ZXing.MultiFormatReader();
-                        
-                        const hints = new Map();
-                        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-                            ZXing.BarcodeFormat.DATA_MATRIX,
-                            ZXing.BarcodeFormat.EAN_13,
-                            ZXing.BarcodeFormat.CODE_128
-                        ]);
-                        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-                        hints.set(ZXing.DecodeHintType.ASSUME_GS1, true);
-                        
-                        try {
-                            const result = reader.decode(binaryBitmap, hints);
-                            if (result) {
-                                const scannedText = result.text;
-                                
-                                // 防止重複掃描
-                                if (lastResult === scannedText) {
-                                    break;
-                                }
-                                lastResult = scannedText;
-                                
-                                if (handleScannedResult(scannedText, result.getBarcodeFormat())) {
-                                    return;
-                                }
+                    const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                    const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+                    const reader = new ZXing.MultiFormatReader();
+                    
+                    const hints = new Map();
+                    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                        ZXing.BarcodeFormat.DATA_MATRIX,
+                        ZXing.BarcodeFormat.EAN_13,
+                        ZXing.BarcodeFormat.CODE_128,
+                        ZXing.BarcodeFormat.QR_CODE
+                    ]);
+                    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+                    
+                    try {
+                        const result = reader.decode(binaryBitmap, hints);
+                        if (result) {
+                            console.log('掃描到條碼:', result.text);
+                            console.log('條碼類型:', result.getBarcodeFormat());
+                            
+                            if (lastResult === result.text) {
+                                console.log('重複掃描，跳過');
+                                requestAnimationFrame(tick);
+                                return;
                             }
-                        } catch (error) {
-                            // 忽略單個區域的掃描錯誤
-                            continue;
+                            lastResult = result.text;
+                            
+                            handleScannedResult(result.text, result.getBarcodeFormat());
+                        }
+                    } catch (error) {
+                        if (error.name !== 'NotFoundException') {
+                            console.log('條碼解碼錯誤:', error);
                         }
                     }
                 } catch (error) {
-                    if (error.name !== 'NotFoundException') {
-                        console.error('條碼讀取錯誤:', error);
-                    }
-                }
-
-                // 2. QR Code 處理
-                const imageData = context.getImageData(
-                    scanRegion.x, scanRegion.y, 
-                    scanRegion.width, scanRegion.height
-                );
-                
-                const qrResult = jsQR(imageData.data, 
-                    scanRegion.width, scanRegion.height, 
-                    {inversionAttempts: "dontInvert"}
-                );
-                
-                if (qrResult) {
-                    handleQRResult(qrResult.data);
+                    console.log('ZXing 處理錯誤:', error);
                 }
 
             } catch (error) {
-                console.error('掃描錯誤:', error);
+                console.error('掃描過程錯誤:', error);
             }
             requestAnimationFrame(tick);
         } else {
@@ -1503,31 +1435,47 @@ async function scanBarcodes() {
     tick();
 }
 
-
 function handleScannedResult(scannedText, format) {
+    console.log('處理掃描結果:', scannedText);
+    console.log('條碼格式:', format);
+
     if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
+        console.log('處理 Data Matrix 碼');
         const match = scannedText.match(/01(\d+?)(?=10|$)/);
+        console.log('GS1 匹配結果:', match);
+        
         if (match && match[1]) {
             const extractedNumber = match[1];
+            console.log('提取的數字:', extractedNumber);
+            
             const itemCode = productIdMap.get(extractedNumber);
+            console.log('對應的 Item Code:', itemCode);
+            
             if (itemCode) {
                 handleItemCode(itemCode);
                 closeScanner();
                 return true;
             } else {
+                console.log('未找到對應的 Item Code');
                 alert(`條碼 ${extractedNumber} 未在系統中登記`);
                 closeScanner();
                 return true;
             }
         }
     } else {
+        console.log('處理一維條碼');
         const normalizedText = normalizeBarcode(scannedText);
+        console.log('標準化後的條碼:', normalizedText);
+        
         const itemCode = productIdMap.get(normalizedText);
+        console.log('對應的 Item Code:', itemCode);
+        
         if (itemCode) {
             handleItemCode(itemCode);
             closeScanner();
             return true;
         } else {
+            console.log('未找到對應的 Item Code');
             alert(`條碼 ${normalizedText} 未在系統中登記`);
             closeScanner();
             return true;
@@ -1535,7 +1483,6 @@ function handleScannedResult(scannedText, format) {
     }
     return false;
 }
-
 
 
 
