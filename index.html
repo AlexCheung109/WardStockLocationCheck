@@ -22,7 +22,8 @@
 
 <!-- 引入 coco-ssd 模型 -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
-
+<!-- 在 head 部分添加 QRious 庫 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
 
     <style>
 
@@ -536,12 +537,19 @@ button:disabled {
         </div>
     </div>
 <script>
-    let data = [];
-    let wards = new Set();
-    let cupboardData = [];
-    let cupboardWards = new Set();
-    let itemDescriptions = new Map();
+// 全局變量
+let data = [];
+let wards = new Set();
+let cupboardData = [];
+let cupboardWards = new Set();
+let itemDescriptions = new Map();
 let productIdMap = new Map();
+let codeReader = null;
+let model = null;
+let scanning = false;
+let animationFrameId = null;
+let lastDetectionTime = 0;
+const detectionInterval = 200;
 
     // Mapping for Duty and Weekday to Scanner
     const dutyWeekdayScannerMap = {
@@ -878,18 +886,22 @@ function normalizeBarcode(text) {
 
 // 找到 updateWardSelect 函數，修改如下：
 function updateWardSelect() {
-    const select = document.getElementById('wardSelect');
-    select.innerHTML = '<option value="">Please select a ward</option>';
-    
-    Array.from(wards).sort(sortWardsDesc).forEach(ward => {
-        const option = document.createElement('option');
-        option.value = ward;
-        option.textContent = ward;
-        select.appendChild(option);
-    });
+    try {
+        const select = document.getElementById('wardSelect');
+        select.innerHTML = '<option value="">Please select a ward</option>';
+        
+        Array.from(wards).sort(sortWardsDesc).forEach(ward => {
+            const option = document.createElement('option');
+            option.value = ward;
+            option.textContent = ward;
+            select.appendChild(option);
+        });
 
-    // 添加 onchange 事件監聽器
-    select.onchange = handleWardSelection;
+        select.onchange = handleWardSelection;
+    } catch (error) {
+        console.error('Error updating ward select:', error);
+    }
+}
 
 // 添加新的函數來處理 ward 選擇
 function handleWardSelection() {
@@ -898,21 +910,18 @@ function handleWardSelection() {
     const scanButton = document.getElementById('scanButton');
     
     if (selectedWard) {
-        // 啟用 item code filter 和 scan button
         itemCodeFilter.disabled = false;
         scanButton.disabled = false;
         itemCodeFilter.placeholder = "Enter Item Code";
-        displayItemCodes(); // 顯示該病房的 item codes
+        displayItemCodes();
     } else {
-        // 禁用 item code filter 和 scan button
         itemCodeFilter.disabled = true;
         scanButton.disabled = true;
         itemCodeFilter.placeholder = "Please select a ward first";
-        itemCodeFilter.value = ''; // 清空輸入
-        document.getElementById('result').innerHTML = ''; // 清空結果
+        itemCodeFilter.value = '';
+        document.getElementById('result').innerHTML = '';
     }
 }
-    }
 
     // Helper function to parse ward into letters, number, and suffix
     function parseWard(ward) {
@@ -1269,9 +1278,7 @@ function handleWardSelection() {
         document.getElementById('weekdaySelect').value = currentWeekday;
     }
 
-let codeReader;
-let model; // 全局变量，存储加载的模型
-let scanning = false;
+
 
 async function startScanner() {
     const selectedWard = document.getElementById('wardSelect').value;
@@ -1385,10 +1392,19 @@ async function scanBarcodes() {
             // 增加解析度和清晰度
             canvas.height = video.videoHeight;
             canvas.width = video.videoWidth;
+            
+            // 擴大掃描區域
+            const scanRegion = {
+                x: canvas.width * 0.1,
+                y: canvas.height * 0.1,
+                width: canvas.width * 0.8,
+                height: canvas.height * 0.8
+            };
+
+            // 繪製完整圖像
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
             const currentTime = Date.now();
-            // 降低掃描間隔以提高靈敏度（從 200ms 改為 100ms）
             if (currentTime - lastCheck < 100) {
                 requestAnimationFrame(tick);
                 return;
@@ -1396,63 +1412,62 @@ async function scanBarcodes() {
             lastCheck = currentTime;
 
             try {
-                // 1. 一維碼和 Data Matrix 處理 (提高優先級)
+                // 1. 一維碼和 Data Matrix 處理
                 try {
-                    const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-                    const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
-                    const reader = new ZXing.MultiFormatReader();
-                    
-                    const hints = new Map();
-                    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-                        ZXing.BarcodeFormat.DATA_MATRIX,
-                        ZXing.BarcodeFormat.EAN_13,
-                        ZXing.BarcodeFormat.CODE_128
-                    ]);
-                    // 添加更多解碼提示
-                    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-                    hints.set(ZXing.DecodeHintType.ASSUME_GS1, true);
-                    
-                    const result = reader.decode(binaryBitmap, hints);
-                    if (result) {
-                        const scannedText = result.text;
-                        const format = result.getBarcodeFormat();
-                        
-                        // 防止重複掃描
-                        if (lastResult === scannedText) {
-                            requestAnimationFrame(tick);
-                            return;
-                        }
-                        lastResult = scannedText;
-                        
-                        console.log('條碼類型:', format, '內容:', scannedText);
+                    // 創建多個掃描區域
+                    const regions = [
+                        // 中心區域
+                        {x: canvas.width * 0.3, y: canvas.height * 0.3, w: canvas.width * 0.4, h: canvas.height * 0.4},
+                        // 左側區域
+                        {x: canvas.width * 0.1, y: canvas.height * 0.2, w: canvas.width * 0.3, h: canvas.height * 0.6},
+                        // 右側區域
+                        {x: canvas.width * 0.6, y: canvas.height * 0.2, w: canvas.width * 0.3, h: canvas.height * 0.6}
+                    ];
 
-                        if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-                            const match = scannedText.match(/01(\d+?)(?=10|$)/);
-                            if (match && match[1]) {
-                                const extractedNumber = match[1];
-                                const itemCode = productIdMap.get(extractedNumber);
-                                if (itemCode) {
-                                    handleItemCode(itemCode);
-                                    closeScanner();
-                                    return;
-                                } else {
-                                    alert(`條碼 ${extractedNumber} 未在系統中登記`);
-                                    closeScanner();
+                    for (const region of regions) {
+                        // 為每個區域創建單獨的 canvas
+                        const regionCanvas = document.createElement('canvas');
+                        regionCanvas.width = region.w;
+                        regionCanvas.height = region.h;
+                        const regionCtx = regionCanvas.getContext('2d');
+                        
+                        // 從主 canvas 複製區域圖像
+                        regionCtx.drawImage(canvas, 
+                            region.x, region.y, region.w, region.h,
+                            0, 0, region.w, region.h
+                        );
+
+                        const source = new ZXing.HTMLCanvasElementLuminanceSource(regionCanvas);
+                        const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+                        const reader = new ZXing.MultiFormatReader();
+                        
+                        const hints = new Map();
+                        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                            ZXing.BarcodeFormat.DATA_MATRIX,
+                            ZXing.BarcodeFormat.EAN_13,
+                            ZXing.BarcodeFormat.CODE_128
+                        ]);
+                        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+                        hints.set(ZXing.DecodeHintType.ASSUME_GS1, true);
+                        
+                        try {
+                            const result = reader.decode(binaryBitmap, hints);
+                            if (result) {
+                                const scannedText = result.text;
+                                
+                                // 防止重複掃描
+                                if (lastResult === scannedText) {
+                                    break;
+                                }
+                                lastResult = scannedText;
+                                
+                                if (handleScannedResult(scannedText, result.getBarcodeFormat())) {
                                     return;
                                 }
                             }
-                        } else {
-                            const normalizedText = normalizeBarcode(scannedText);
-                            const itemCode = productIdMap.get(normalizedText);
-                            if (itemCode) {
-                                handleItemCode(itemCode);
-                                closeScanner();
-                                return;
-                            } else {
-                                alert(`條碼 ${normalizedText} 未在系統中登記`);
-                                closeScanner();
-                                return;
-                            }
+                        } catch (error) {
+                            // 忽略單個區域的掃描錯誤
+                            continue;
                         }
                     }
                 } catch (error) {
@@ -1461,22 +1476,19 @@ async function scanBarcodes() {
                     }
                 }
 
-                // 2. QR Code 處理 (次要優先級)
-                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                const qrResult = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: "dontInvert"
-                });
+                // 2. QR Code 處理
+                const imageData = context.getImageData(
+                    scanRegion.x, scanRegion.y, 
+                    scanRegion.width, scanRegion.height
+                );
+                
+                const qrResult = jsQR(imageData.data, 
+                    scanRegion.width, scanRegion.height, 
+                    {inversionAttempts: "dontInvert"}
+                );
                 
                 if (qrResult) {
-                    console.log('QR Code detected:', qrResult.data);
-                    const match = qrResult.data.match(/<F>(.*?)<\/F>/);
-                    if (match && match[1]) {
-                        console.log('Found value in F tags:', match[1]);
-                        document.getElementById('itemCodeFilter').value = match[1];
-                        filterItemCodes();
-                        closeScanner();
-                        return;
-                    }
+                    handleQRResult(qrResult.data);
                 }
 
             } catch (error) {
@@ -1492,10 +1504,42 @@ async function scanBarcodes() {
 }
 
 
-let lastDetectionTime = 0;
-const detectionInterval = 200; // 毫秒，200ms 即每秒 5 次
+function handleScannedResult(scannedText, format) {
+    if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
+        const match = scannedText.match(/01(\d+?)(?=10|$)/);
+        if (match && match[1]) {
+            const extractedNumber = match[1];
+            const itemCode = productIdMap.get(extractedNumber);
+            if (itemCode) {
+                handleItemCode(itemCode);
+                closeScanner();
+                return true;
+            } else {
+                alert(`條碼 ${extractedNumber} 未在系統中登記`);
+                closeScanner();
+                return true;
+            }
+        }
+    } else {
+        const normalizedText = normalizeBarcode(scannedText);
+        const itemCode = productIdMap.get(normalizedText);
+        if (itemCode) {
+            handleItemCode(itemCode);
+            closeScanner();
+            return true;
+        } else {
+            alert(`條碼 ${normalizedText} 未在系統中登記`);
+            closeScanner();
+            return true;
+        }
+    }
+    return false;
+}
 
-let animationFrameId; // 新增全局變量
+
+
+
+
 
 function detectFrame(video, overlay, model) {
     if (!scanning) return;
@@ -1530,77 +1574,67 @@ function renderPredictions(predictions, overlay) {
     const ctx = overlay.getContext('2d');
     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-    // 确保 overlay 尺寸与视频匹配
     const video = document.getElementById('scanner-video');
     overlay.width = video.videoWidth;
     overlay.height = video.videoHeight;
 
-    ctx.font = '16px Arial';
-    ctx.textBaseline = 'top';
+    // 繪製整個掃描區域指示
+    ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+    ctx.lineWidth = 2;
+    // 繪製較大的掃描區域（覆蓋約 80% 的屏幕）
+    const margin = {
+        x: overlay.width * 0.1,
+        y: overlay.height * 0.1
+    };
+    ctx.strokeRect(
+        margin.x, 
+        margin.y, 
+        overlay.width - margin.x * 2, 
+        overlay.height - margin.y * 2
+    );
 
-    // 檢測到的物體數量
-    let detectedObjects = 0;
-
-    predictions.forEach(prediction => {
-        // 只處理可能是條碼的物體（例如：手機、書本等）
-        if (prediction.class === 'cell phone' || 
-            prediction.class === 'book' || 
-            prediction.class === 'remote') {
-            detectedObjects++;
-            const [x, y, width, height] = prediction.bbox;
-            
-            // 绘制边界框
-            ctx.strokeStyle = '#00ff00';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x, y, width, height);
-
-            // 在框內顯示綠色提示
-            ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
-            ctx.fillRect(x, y > 10 ? y - 20 : y + height, width, 20);
-            ctx.fillStyle = '#000000';
-            ctx.textAlign = 'center';
-            ctx.fillText('掃描中...', x + width/2, y > 10 ? y - 18 : y + height + 2);
-        }
-    });
-
-    // 只有在完全沒有檢測到任何物體時才顯示提示
-    if (detectedObjects === 0) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-        ctx.fillRect(overlay.width/2 - 100, overlay.height/2 - 20, 200, 40);
-        ctx.fillStyle = '#ff0000';
-        ctx.textAlign = 'center';
-        ctx.fillText('請將條碼置於框內', overlay.width/2, overlay.height/2);
-    }
+    // 添加掃描動畫效果
+    const scanLineY = ((Date.now() % 2000) / 2000) * (overlay.height - margin.y * 2) + margin.y;
+    ctx.beginPath();
+    ctx.moveTo(margin.x, scanLineY);
+    ctx.lineTo(overlay.width - margin.x, scanLineY);
+    ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
+    ctx.stroke();
 }
 function closeScanner() {
-    scanning = false;
-    const modal = document.getElementById('scannerModal');
-    const video = document.getElementById('scanner-video');
-    const overlay = document.getElementById('overlay');
-    
-    // 正確取消動畫幀
-    if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
-    }
-    
-    // 隱藏模態框
-    modal.style.display = 'none';
-    
-    // 停止視頻流
-    if (video.srcObject) {
-        const tracks = video.srcObject.getTracks();
-        tracks.forEach(track => {
-            track.stop();
-        });
-        video.srcObject = null;
-    }
+    try {
+        scanning = false;
+        const modal = document.getElementById('scannerModal');
+        const video = document.getElementById('scanner-video');
+        const overlay = document.getElementById('overlay');
+        
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
+        
+        modal.style.display = 'none';
+        
+        if (video.srcObject) {
+            const tracks = video.srcObject.getTracks();
+            tracks.forEach(track => {
+                try {
+                    track.stop();
+                } catch (e) {
+                    console.error('Error stopping track:', e);
+                }
+            });
+            video.srcObject = null;
+        }
 
-    // 清理 canvas
-    const ctx = overlay.getContext('2d');
-    ctx.clearRect(0, 0, overlay.width, overlay.height);
+        if (overlay) {
+            const ctx = overlay.getContext('2d');
+            ctx.clearRect(0, 0, overlay.width, overlay.height);
+        }
+    } catch (error) {
+        console.error('Error closing scanner:', error);
+    }
 }
-
 
 function handleDecodedResult(scannedText, format) {
     if (!scannedText) {
@@ -1666,17 +1700,12 @@ function handleDataMatrix(scannedText) {
     }
 }
 
-function handleQRCode(scannedText) {
-    console.log('QR Code 内容:', scannedText);
-    // 修改为匹配包含大写 F 标签的值
-    const match = scannedText.match(/<F>(.*?)<\/F>/i);
+function handleQRResult(data) {
+    const match = data.match(/<F>(.*?)<\/F>/);
     if (match && match[1]) {
-        const value = match[1];
-        console.log('在 F 标签中找到的值:', value);
-        document.getElementById('itemCodeFilter').value = value;
+        document.getElementById('itemCodeFilter').value = match[1];
         filterItemCodes();
-    } else {
-        alert('无法识别的 QR Code 格式');
+        closeScanner();
     }
 }
 
