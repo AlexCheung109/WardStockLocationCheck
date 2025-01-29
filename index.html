@@ -1284,8 +1284,7 @@ async function scanBarcodes() {
     const video = document.getElementById('scanner-video');
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
-    
-    // Reset scanning state
+
     scanning = true;
 
     async function tick() {
@@ -1297,9 +1296,22 @@ async function scanBarcodes() {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
             try {
-                // QR Code processing remains the same...
+                // 1. QR Code processing
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+                if (qrResult) {
+                    console.log('QR Code detected:', qrResult.data);
+                    const qrContent = qrResult.data;
+                    if (qrContent.includes('<F>') && qrContent.includes('</F>')) {
+                        const fMatch = qrContent.match(/<F>(.*?)<\/F>/);
+                        if (fMatch && fMatch[1]) {
+                            handleItemCode(fMatch[1]);
+                            return;
+                        }
+                    }
+                }
 
-                // Data Matrix and 1D barcode processing
+                // 2. Data Matrix and 1D barcode processing
                 const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
                 const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
                 const reader = new ZXing.MultiFormatReader();
@@ -1322,11 +1334,13 @@ async function scanBarcodes() {
                         if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
                             console.log('Processing Data Matrix:', scannedText);
                             
-                            // Check for GS1 format
+                            // Check for GS1 format (starts with "01")
                             if (scannedText.startsWith('01')) {
-                                const match = scannedText.match(/01(\d+?)(?=10|11|17|21|$)/);
+                                // Modified: Only extract numbers between "01" and "10"
+                                const match = scannedText.match(/01(\d+?)(?=10|$)/);
                                 if (match && match[1]) {
                                     const extractedNumber = match[1];
+                                    console.log('Extracted GS1 number:', extractedNumber);
                                     const itemCode = productIdMap.get(extractedNumber);
                                     
                                     if (itemCode) {
@@ -1346,7 +1360,20 @@ async function scanBarcodes() {
                             return;
                         }
                         
-                        // 1D barcode handling remains the same...
+                        // 1D barcode handling (EAN-13, CODE-128)
+                        else if (format === ZXing.BarcodeFormat.EAN_13 || 
+                                format === ZXing.BarcodeFormat.CODE_128) {
+                            const normalizedText = normalizeBarcode(scannedText);
+                            const itemCode = productIdMap.get(normalizedText);
+                            if (itemCode) {
+                                handleItemCode(itemCode);
+                                return;
+                            } else {
+                                alert(`條碼 ${normalizedText} 未在系統中登記`);
+                                closeScanner();
+                                return;
+                            }
+                        }
                     }
                 } catch (readerError) {
                     if (readerError.name !== 'NotFoundException') {
@@ -1357,6 +1384,7 @@ async function scanBarcodes() {
                 console.error('General scanning error:', error);
             }
         }
+
         if (scanning) {
             requestAnimationFrame(tick);
         }
@@ -1364,8 +1392,6 @@ async function scanBarcodes() {
 
     tick();
 }
-
-
 function closeScanner() {
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
