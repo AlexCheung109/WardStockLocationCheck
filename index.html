@@ -1330,35 +1330,56 @@ async function scanBarcodes() {
                         const format = result.getBarcodeFormat();
                         console.log('Barcode detected:', format, scannedText);
 
-                        // Data Matrix handling
-                        if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-                            console.log('Processing Data Matrix:', scannedText);
-                            
-                            // Check for GS1 format (starts with "01")
-                            if (scannedText.startsWith('01')) {
-                                // Modified: Only extract numbers between "01" and "10"
-                                const match = scannedText.match(/01(\d+?)(?=10|$)/);
-                                if (match && match[1]) {
-                                    const extractedNumber = match[1];
-                                    console.log('Extracted GS1 number:', extractedNumber);
-                                    const itemCode = productIdMap.get(extractedNumber);
-                                    
-                                    if (itemCode) {
-                                        handleItemCode(itemCode);
-                                        return;
-                                    } else {
-                                        alert(`條碼內容：${scannedText} 未於系統登記`);
-                                        closeScanner();
-                                        return;
-                                    }
-                                }
-                            }
-                            
-                            // If not recognized as GS1
-                            alert('無法識別的條碼格式');
-                            closeScanner();
-                            return;
-                        }
+console.log('Raw scanned text:', scannedText);
+console.log('Checking for GTIN format...');
+
+// Data Matrix handling
+if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
+    console.log('Processing Data Matrix:', scannedText);
+    
+    // 先檢查是否包含 "GTIN" 文本
+    if (scannedText.includes('GTIN')) {
+        const gtinMatch = scannedText.match(/GTIN\s*(\d+)/i);
+        if (gtinMatch && gtinMatch[1]) {
+            const extractedNumber = gtinMatch[1];
+            console.log('Extracted GTIN from text:', extractedNumber);
+            const itemCode = productIdMap.get(extractedNumber);
+            
+            if (itemCode) {
+                handleItemCode(itemCode);
+                return;
+            } else {
+                alert(`條碼內容：GTIN ${extractedNumber} 未於系統登記`);
+                closeScanner();
+                return;
+            }
+        }
+    }
+    
+    // 如果不是 GTIN 文本格式，檢查 GS1 格式
+    if (scannedText.startsWith('01')) {
+        const match = scannedText.match(/01(\d+?)(?=10|$)/);
+        if (match && match[1]) {
+            const extractedNumber = match[1];
+            console.log('Extracted GS1 number:', extractedNumber);
+            const itemCode = productIdMap.get(extractedNumber);
+            
+            if (itemCode) {
+                handleItemCode(itemCode);
+                return;
+            } else {
+                alert(`條碼內容：${scannedText} 未於系統登記`);
+                closeScanner();
+                return;
+            }
+        }
+    }
+    
+    // 顯示實際掃描到的內容
+    alert(`條碼內容：${scannedText} 未於系統登記`);
+    closeScanner();
+    return;
+}
                         
                         // 1D barcode handling (EAN-13, CODE-128)
                         else if (format === ZXing.BarcodeFormat.EAN_13 || 
@@ -1382,6 +1403,8 @@ async function scanBarcodes() {
                 }
             } catch (error) {
                 console.error('General scanning error:', error);
+    console.log('Scanning state:', scanning);
+    console.log('Video state:', video.readyState);
             }
         }
 
