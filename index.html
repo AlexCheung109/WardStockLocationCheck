@@ -1509,27 +1509,33 @@ function renderPredictions(predictions, overlay) {
     ctx.font = '16px Arial';
     ctx.textBaseline = 'top';
 
+    // 檢測到的物體數量
+    let detectedObjects = 0;
+
     predictions.forEach(prediction => {
-        const [x, y, width, height] = prediction.bbox;
-        const label = `${prediction.class} ${Math.round(prediction.score * 100)}%`;
+        // 只處理可能是條碼的物體（例如：手機、書本等）
+        if (prediction.class === 'cell phone' || 
+            prediction.class === 'book' || 
+            prediction.class === 'remote') {
+            detectedObjects++;
+            const [x, y, width, height] = prediction.bbox;
+            
+            // 绘制边界框
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, width, height);
 
-        // 绘制边界框
-        ctx.strokeStyle = '#00ff00';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, width, height);
-
-        // 绘制标签背景
-        ctx.fillStyle = '#00ff00';
-        const textWidth = ctx.measureText(label).width;
-        ctx.fillRect(x, y > 10 ? y - 20 : y + height, textWidth + 4, 20);
-
-        // 绘制标签文字
-        ctx.fillStyle = '#000000';
-        ctx.fillText(label, x + 2, y > 10 ? y - 18 : y + height + 2);
+            // 在框內顯示綠色提示
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
+            ctx.fillRect(x, y > 10 ? y - 20 : y + height, width, 20);
+            ctx.fillStyle = '#000000';
+            ctx.textAlign = 'center';
+            ctx.fillText('掃描中...', x + width/2, y > 10 ? y - 18 : y + height + 2);
+        }
     });
 
-    // 如果没有检测到物体，显示提示
-    if (predictions.length === 0) {
+    // 只有在完全沒有檢測到任何物體時才顯示提示
+    if (detectedObjects === 0) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
         ctx.fillRect(overlay.width/2 - 100, overlay.height/2 - 20, 200, 40);
         ctx.fillStyle = '#ff0000';
@@ -1537,7 +1543,6 @@ function renderPredictions(predictions, overlay) {
         ctx.fillText('請將條碼置於框內', overlay.width/2, overlay.height/2);
     }
 }
-
 function closeScanner() {
     scanning = false;
     const modal = document.getElementById('scannerModal');
