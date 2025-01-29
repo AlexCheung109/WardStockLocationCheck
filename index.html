@@ -17,7 +17,22 @@
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
 
+<!-- 引入 TensorFlow.js -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.9.0/dist/tf.min.js"></script>
+
+<!-- 引入 coco-ssd 模型 -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
+
+
     <style>
+
+#overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
 
 .animate-spin {
     animation: spin 1s linear infinite;
@@ -434,7 +449,8 @@ button:disabled {
         </div>
         <div id="scanner-container">
             <video id="scanner-video" playsinline></video>
-            <div class="scanner-overlay"></div>
+            <!-- 添加 Canvas 元素 -->
+            <canvas id="overlay" class="overlay"></canvas>
         </div>
     </div>
 </div>
@@ -1249,10 +1265,11 @@ function handleWardSelection() {
         document.getElementById('weekdaySelect').value = currentWeekday;
     }
 
-// 全局变量，用于存储 codeReader 实例
 let codeReader;
+let model; // 全局变量，存储加载的模型
+let scanning = false; // 标记是否正在扫描
 
-function startScanner() {
+async function startScanner() {
     const selectedWard = document.getElementById('wardSelect').value;
     if (!selectedWard) {
         alert('请先选择病房');
@@ -1261,6 +1278,7 @@ function startScanner() {
 
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
+    const overlay = document.getElementById('overlay');
     modal.style.display = 'block';
 
     // 初始化 codeReader
@@ -1268,30 +1286,118 @@ function startScanner() {
         codeReader = new ZXing.BrowserMultiFormatReader();
     }
 
+    // 加载 TensorFlow.js 模型
+    if (!model) {
+        try {
+            model = await cocoSsd.load();
+            console.log('模型加载成功');
+        } catch (error) {
+            console.error('模型加载失败:', error);
+            alert('模型加载失败，请检查网络连接。');
+            return;
+        }
+    }
+
     codeReader.getVideoInputDevices()
         .then(videoInputDevices => {
             // 选择后置摄像头
             const selectedDeviceId = videoInputDevices[0].deviceId;
 
-            codeReader.decodeOnceFromVideoDevice(selectedDeviceId, 'scanner-video')
-                .then(result => {
+            // 开始解码视频设备
+            codeReader.decodeFromVideoDevice(selectedDeviceId, 'scanner-video', (result, err) => {
+                if (result) {
                     const scannedText = result.text;
                     const format = result.result.barcodeFormat;
                     console.log('条码类型:', format, '内容:', scannedText);
 
                     handleDecodedResult(scannedText, format);
                     closeScanner();
-                })
-                .catch(err => {
+                }
+                if (err && !(err instanceof ZXing.NotFoundException)) {
                     console.error(err);
-                    alert('未能识别条码，请重试。');
-                    closeScanner();
-                });
+                }
+                // 不再在这里调用 detectFrame()
+            });
+
+            // 开始对象检测
+            scanning = true;
+            detectFrame(video, overlay, model);
+
         })
         .catch(err => {
             console.error(err);
             alert('无法访问相机，请检查权限设置。');
         });
+}
+
+
+let lastDetectionTime = 0;
+const detectionInterval = 200; // 毫秒，200ms 即每秒 5 次
+
+function detectFrame(video, overlay, model) {
+    const currentTime = Date.now();
+    if (currentTime - lastDetectionTime > detectionInterval) {
+        lastDetectionTime = currentTime;
+
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+
+        // 设置临时 Canvas 的尺寸（缩小尺寸）
+        const scale = 0.5; // 缩小一半
+        tempCanvas.width = video.videoWidth * scale;
+        tempCanvas.height = video.videoHeight * scale;
+
+        tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+
+        model.detect(tempCanvas).then(predictions => {
+            // 调整预测框的位置和尺寸
+            predictions.forEach(prediction => {
+                prediction.bbox = prediction.bbox.map(value => value / scale);
+            });
+
+            renderPredictions(predictions, overlay);
+            // 在这里不需要再次调用 detectFrame，因为 requestAnimationFrame 已经在外部调用
+        });
+    }
+
+    if (scanning) {
+        requestAnimationFrame(() => {
+            detectFrame(video, overlay, model);
+        });
+    }
+}
+
+function renderPredictions(predictions, overlay) {
+    const ctx = overlay.getContext('2d');
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+    overlay.width = overlay.clientWidth;
+    overlay.height = overlay.clientHeight;
+
+    // 假设我们有一个检测到的条码
+    const barcodePrediction = predictions.find(prediction => {
+        return prediction.class === 'book' || prediction.class === 'cell phone';
+    });
+
+    if (barcodePrediction) {
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'green';
+
+        const [x, y, width, height] = barcodePrediction.bbox;
+        ctx.strokeRect(x, y, width, height);
+
+        ctx.fillStyle = 'green';
+        ctx.fillText(
+            `${barcodePrediction.class} ${Math.round(barcodePrediction.score * 100)}%`,
+            x,
+            y > 10 ? y - 5 : y + 15
+        );
+    } else {
+        // 如果未检测到条码，可以提示用户对准条码
+        ctx.fillStyle = 'red';
+        ctx.font = '16px Arial';
+        ctx.fillText('请将条码置于屏幕中央', overlay.width / 2 - 60, overlay.height / 2);
+    }
 }
 
 function closeScanner() {
@@ -1301,7 +1407,14 @@ function closeScanner() {
     if (codeReader) {
         codeReader.reset();
     }
+    scanning = false;
+
+    // 清空 overlay 画布
+    const ctx = overlay.getContext('2d');
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
 }
+
+
 
 function handleDecodedResult(scannedText, format) {
     if (!scannedText) {
