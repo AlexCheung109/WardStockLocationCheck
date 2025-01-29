@@ -1375,49 +1375,55 @@ async function scanBarcodes() {
     const video = document.getElementById('scanner-video');
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
+    let lastResult = null;
+    let lastCheck = 0;
 
     async function tick() {
         if (!scanning) return;
 
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            // 增加解析度和清晰度
             canvas.height = video.videoHeight;
             canvas.width = video.videoWidth;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            try {
-                // 1. QR Code 處理
-                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
-                
-                if (qrResult) {
-                    console.log('QR Code detected:', qrResult.data);
-                    const match = qrResult.data.match(/<F>(.*?)<\/F>/);
-                    if (match && match[1]) {
-                        console.log('Found value in F tags:', match[1]);
-                        document.getElementById('itemCodeFilter').value = match[1];
-                        filterItemCodes();
-                        closeScanner();
-                        return;
-                    }
-                }
+            const currentTime = Date.now();
+            // 降低掃描間隔以提高靈敏度（從 200ms 改為 100ms）
+            if (currentTime - lastCheck < 100) {
+                requestAnimationFrame(tick);
+                return;
+            }
+            lastCheck = currentTime;
 
-                // 2. Data Matrix 和條碼處理
-                const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-                const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
-                const reader = new ZXing.MultiFormatReader();
-                
-                const hints = new Map();
-                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-                    ZXing.BarcodeFormat.DATA_MATRIX,
-                    ZXing.BarcodeFormat.EAN_13,
-                    ZXing.BarcodeFormat.CODE_128
-                ]);
-                
+            try {
+                // 1. 一維碼和 Data Matrix 處理 (提高優先級)
                 try {
+                    const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                    const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+                    const reader = new ZXing.MultiFormatReader();
+                    
+                    const hints = new Map();
+                    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                        ZXing.BarcodeFormat.DATA_MATRIX,
+                        ZXing.BarcodeFormat.EAN_13,
+                        ZXing.BarcodeFormat.CODE_128
+                    ]);
+                    // 添加更多解碼提示
+                    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+                    hints.set(ZXing.DecodeHintType.ASSUME_GS1, true);
+                    
                     const result = reader.decode(binaryBitmap, hints);
                     if (result) {
                         const scannedText = result.text;
                         const format = result.getBarcodeFormat();
+                        
+                        // 防止重複掃描
+                        if (lastResult === scannedText) {
+                            requestAnimationFrame(tick);
+                            return;
+                        }
+                        lastResult = scannedText;
+                        
                         console.log('條碼類型:', format, '內容:', scannedText);
 
                         if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
@@ -1427,6 +1433,7 @@ async function scanBarcodes() {
                                 const itemCode = productIdMap.get(extractedNumber);
                                 if (itemCode) {
                                     handleItemCode(itemCode);
+                                    closeScanner();
                                     return;
                                 } else {
                                     alert(`條碼 ${extractedNumber} 未在系統中登記`);
@@ -1439,6 +1446,7 @@ async function scanBarcodes() {
                             const itemCode = productIdMap.get(normalizedText);
                             if (itemCode) {
                                 handleItemCode(itemCode);
+                                closeScanner();
                                 return;
                             } else {
                                 alert(`條碼 ${normalizedText} 未在系統中登記`);
@@ -1452,6 +1460,25 @@ async function scanBarcodes() {
                         console.error('條碼讀取錯誤:', error);
                     }
                 }
+
+                // 2. QR Code 處理 (次要優先級)
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const qrResult = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "dontInvert"
+                });
+                
+                if (qrResult) {
+                    console.log('QR Code detected:', qrResult.data);
+                    const match = qrResult.data.match(/<F>(.*?)<\/F>/);
+                    if (match && match[1]) {
+                        console.log('Found value in F tags:', match[1]);
+                        document.getElementById('itemCodeFilter').value = match[1];
+                        filterItemCodes();
+                        closeScanner();
+                        return;
+                    }
+                }
+
             } catch (error) {
                 console.error('掃描錯誤:', error);
             }
@@ -1463,6 +1490,8 @@ async function scanBarcodes() {
 
     tick();
 }
+
+
 let lastDetectionTime = 0;
 const detectionInterval = 200; // 毫秒，200ms 即每秒 5 次
 
