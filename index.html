@@ -10,30 +10,15 @@
 <!-- Include jsQR Library -->
 
 <!-- 在 head 部分添加，在其他 script 標籤後面 -->
-<script src="https://unpkg.com/@zxing/browser@latest"></script>
+<script src="https://unpkg.com/@zxing/library@latest"></script>
 
 
 <!-- 在 head 部分添加 -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
 
-<!-- 引入 TensorFlow.js -->
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.9.0/dist/tf.min.js"></script>
-
-<!-- 引入 coco-ssd 模型 -->
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
-
-
     <style>
 
-#overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-}
 .animate-spin {
     animation: spin 1s linear infinite;
 }
@@ -90,6 +75,7 @@ button:disabled {
     border-radius: 10px;
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
 }
+
 
 
 
@@ -433,9 +419,12 @@ button:disabled {
                placeholder="Please select a ward first" 
                disabled 
                oninput="filterItemCodes()">
-<button id="scanButton" class="scan-button" onclick="startScanner()" disabled>
-    Scan Barcode
-</button>
+        <button id="scanButton" 
+                class="scan-button" 
+                onclick="startScanner()" 
+                disabled>
+            Scan Barcode
+        </button>
     </div>
 </div>
 
@@ -446,11 +435,10 @@ button:disabled {
             <span>Scan Barcode</span>
             <button class="close-button" onclick="closeScanner()">&times;</button>
         </div>
-<div id="scanner-container">
-    <video id="scanner-video" playsinline></video>
-    <canvas id="overlay" class="overlay"></canvas>
-    <div class="scanner-overlay"></div>
-</div>
+        <div id="scanner-container">
+            <video id="scanner-video" playsinline></video>
+            <div class="scanner-overlay"></div>
+        </div>
     </div>
 </div>
         
@@ -683,52 +671,34 @@ function switchTab(tabId, button) {
 
 async function loadProductIds() {
     try {
-        // 检查本地缓存
-        const cachedData = localStorage.getItem('ProductIDData');
-        const lastUpdate = localStorage.getItem('ProductIDLastUpdate');
-        const currentTime = new Date().getTime();
-
-        // 如果缓存存在且在一周内（根据需要调整）
-        if (cachedData && lastUpdate && (currentTime - lastUpdate) < 7 * 24 * 60 * 60 * 1000) {
-            const productData = JSON.parse(cachedData);
-            productIdMap.clear();
-            productData.forEach(row => {
-                if (row.productId && row.itemCode) {
-                    productIdMap.set(row.productId.toString().trim(), row.itemCode.toString().trim());
-                }
-            });
-            console.log('Product ID mapping loaded from cache:', productIdMap.size, 'entries');
-        } else {
-            // 如果没有缓存或缓存过期，重新从网络加载
-            const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Product_ID.xlsx';
-            const response = await fetch(excelUrl);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const arrayBuffer = await response.arrayBuffer();
-            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-
-            const productData = XLSX.utils.sheet_to_json(worksheet, {
-                header: ['itemCode', 'productId'],
-                range: 1
-            });
-
-            // 存储到缓存
-            localStorage.setItem('ProductIDData', JSON.stringify(productData));
-            localStorage.setItem('ProductIDLastUpdate', currentTime);
-
-            // 加载数据到 Map
-            productIdMap.clear();
-            productData.forEach(row => {
-                if (row.productId && row.itemCode) {
-                    productIdMap.set(row.productId.toString().trim(), row.itemCode.toString().trim());
-                }
-            });
-            console.log('Product ID mapping loaded from network:', productIdMap.size, 'entries');
+        const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Product_ID.xlsx';
+        const response = await fetch(excelUrl);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        const productData = XLSX.utils.sheet_to_json(worksheet, {
+            header: ['itemCode', 'productId'],
+            range: 1
+        });
+
+        // 清空當前的 Map
+        productIdMap.clear();
+        
+        // 將 productId 作為 key，itemCode 作為 value 存入 Map
+        productData.forEach(row => {
+            if (row.productId && row.itemCode) {
+                productIdMap.set(row.productId.toString().trim(), row.itemCode.toString().trim());
+            }
+        });
+        
+        console.log('Product ID mapping loaded:', productIdMap.size, 'entries');
+        
     } catch (error) {
         console.error('Error loading product IDs:', error);
         document.getElementById('error').textContent = 'Error loading product IDs: ' + error.message;
@@ -1265,10 +1235,10 @@ function handleWardSelection() {
     }
 
 let codeReader;
-let model; // 全局变量，存储加载的模型
 let scanning = false;
+let frameCount = 0;
 
-async function startScanner() {
+function startScanner() {
     const selectedWard = document.getElementById('wardSelect').value;
     if (!selectedWard) {
         alert('請先選擇病房');
@@ -1277,60 +1247,27 @@ async function startScanner() {
 
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
-    const overlay = document.getElementById('overlay');
     modal.style.display = 'block';
-
-    try {
-        // 加载 TensorFlow.js 模型
-        if (!model) {
-            try {
-                model = await cocoSsd.load();
-                console.log('模型加載成功');
-            } catch (error) {
-                console.error('模型加載失敗:', error);
-            }
-        }
-
-        // 请求相机权限并设置视频流
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: "environment",
-                width: { ideal: 1920 },
-                height: { ideal: 1080 },
-                focusMode: "continuous"
-            }
+    
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: "environment"
+            } 
+        })
+        .then(function(stream) {
+            video.srcObject = stream;
+            video.setAttribute('playsinline', true);
+            video.play();
+            scanning = true;
+            scanBarcodes();
+        })
+        .catch(function(error) {
+            console.error("相機錯誤: ", error);
+            alert("無法訪問相機，請確認已授予相機權限。");
         });
-
-        video.srcObject = stream;
-        video.setAttribute('playsinline', true);
-
-        // 等待视频准备就绪
-        await new Promise((resolve) => {
-            video.onloadedmetadata = resolve;
-        });
-
-        await video.play();
-
-        // 设置 overlay canvas 尺寸
-        overlay.width = video.videoWidth;
-        overlay.height = video.videoHeight;
-
-        // 开始扫描
-        scanning = true;
-        scanBarcodes();
-
-        // 如果模型加载成功，开始物体检测
-        if (model) {
-            detectFrame(video, overlay, model);
-        }
-
-    } catch (error) {
-        console.error("相機訪問錯誤:", error);
-        alert("無法訪問相機，請確認已授予相機權限。");
-        closeScanner();
     }
 }
-
 
 async function scanBarcodes() {
     const video = document.getElementById('scanner-video');
@@ -1352,17 +1289,19 @@ async function scanBarcodes() {
                 
                 if (qrResult) {
                     console.log('QR Code detected:', qrResult.data);
+                    // 修改為大寫 F 標籤的匹配
                     const match = qrResult.data.match(/<F>(.*?)<\/F>/);
                     if (match && match[1]) {
-                        console.log('Found value in F tags:', match[1]);
-                        document.getElementById('itemCodeFilter').value = match[1];
+                        const value = match[1];
+                        console.log('Found value in F tags:', value);
+                        document.getElementById('itemCodeFilter').value = value;
                         filterItemCodes();
                         closeScanner();
                         return;
                     }
                 }
 
-                // 2. Data Matrix 和條碼處理
+                // 2. Data Matrix 和一維碼處理
                 const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
                 const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
                 const reader = new ZXing.MultiFormatReader();
@@ -1382,6 +1321,7 @@ async function scanBarcodes() {
                         console.log('條碼類型:', format, '內容:', scannedText);
 
                         if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
+                            // 尋找 01 之後到 10 之前的數字
                             const match = scannedText.match(/01(\d+?)(?=10|$)/);
                             if (match && match[1]) {
                                 const extractedNumber = match[1];
@@ -1391,14 +1331,13 @@ async function scanBarcodes() {
                                     return;
                                 }
                             }
-                        } else {
+                        } else if (format === ZXing.BarcodeFormat.EAN_13 || 
+                                 format === ZXing.BarcodeFormat.CODE_128) {
                             const normalizedText = normalizeBarcode(scannedText);
                             const itemCode = productIdMap.get(normalizedText);
                             if (itemCode) {
                                 handleItemCode(itemCode);
                                 return;
-                            } else {
-                                console.log('未找到對應的商品代碼:', normalizedText);
                             }
                         }
                     }
@@ -1418,191 +1357,114 @@ async function scanBarcodes() {
 
     tick();
 }
-
-let lastDetectionTime = 0;
-const detectionInterval = 200; // 毫秒，200ms 即每秒 5 次
-
-function detectFrame(video, overlay, model) {
-    if (!scanning) return;
-
-    const currentTime = Date.now();
-    if (currentTime - lastDetectionTime > detectionInterval) {
-        lastDetectionTime = currentTime;
-
-        // 创建临时 canvas 并缩小尺寸以提高性能
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-        const scale = 0.5;
-        tempCanvas.width = video.videoWidth * scale;
-        tempCanvas.height = video.videoHeight * scale;
-        tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
-
-        // 执行对象检测
-        model.detect(tempCanvas).then(predictions => {
-            predictions.forEach(prediction => {
-                prediction.bbox = prediction.bbox.map(value => value / scale);
-            });
-            renderPredictions(predictions, overlay);
-        }).catch(error => {
-            console.error('物體檢測錯誤:', error);
-        });
-    }
-
-    requestAnimationFrame(() => detectFrame(video, overlay, model));
-}
-
-function renderPredictions(predictions, overlay) {
-    const ctx = overlay.getContext('2d');
-    ctx.clearRect(0, 0, overlay.width, overlay.height);
-
-    // 确保 overlay 尺寸与视频匹配
-    const video = document.getElementById('scanner-video');
-    overlay.width = video.videoWidth;
-    overlay.height = video.videoHeight;
-
-    ctx.font = '16px Arial';
-    ctx.textBaseline = 'top';
-
-    predictions.forEach(prediction => {
-        const [x, y, width, height] = prediction.bbox;
-        const label = `${prediction.class} ${Math.round(prediction.score * 100)}%`;
-
-        // 绘制边界框
-        ctx.strokeStyle = '#00ff00';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, width, height);
-
-        // 绘制标签背景
-        ctx.fillStyle = '#00ff00';
-        const textWidth = ctx.measureText(label).width;
-        ctx.fillRect(x, y > 10 ? y - 20 : y + height, textWidth + 4, 20);
-
-        // 绘制标签文字
-        ctx.fillStyle = '#000000';
-        ctx.fillText(label, x + 2, y > 10 ? y - 18 : y + height + 2);
-    });
-
-    // 如果没有检测到物体，显示提示
-    if (predictions.length === 0) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-        ctx.fillRect(overlay.width/2 - 100, overlay.height/2 - 20, 200, 40);
-        ctx.fillStyle = '#ff0000';
-        ctx.textAlign = 'center';
-        ctx.fillText('請將條碼置於框內', overlay.width/2, overlay.height/2);
-    }
-}
-
 function closeScanner() {
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
-    const overlay = document.getElementById('overlay');
     
     scanning = false;
     modal.style.display = 'none';
     
-    // 清理视频流
     if (video.srcObject) {
         const tracks = video.srcObject.getTracks();
-        tracks.forEach(track => track.stop());
+        tracks.forEach(track => {
+            track.stop();
+        });
         video.srcObject = null;
     }
-
-    // 清理 overlay
-    const ctx = overlay.getContext('2d');
-    ctx.clearRect(0, 0, overlay.width, overlay.height);
 }
 
 
+// 顯示 Loading
+function showLoading() {
+    const modal = document.createElement('div');
+    modal.id = 'loadingModal';
+    modal.innerHTML = `
+        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white p-4 rounded-lg shadow-lg text-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+                <p class="mt-2">分析條碼中...</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
 
-function handleDecodedResult(scannedText, format) {
-    if (!scannedText) {
-        console.error('未提供扫描结果');
+// 隱藏 Loading
+function hideLoading() {
+    const modal = document.getElementById('loadingModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// 處理 DataMatrix
+async function handleDataMatrix(scannedText) {
+    try {
+        console.log('Analyzing DataMatrix:', scannedText);
+        
+        // 首先檢查是否是 GS1 格式 (以 '01' 開頭)
+        if (scannedText.startsWith('01')) {
+            const match = scannedText.match(/01(\d+?)(?=17|$)/);
+            if (match && match[1]) {
+                const gtinPart = match[1];
+                console.log('Extracted GTIN from GS1:', gtinPart);
+                const itemCode = productIdMap.get(gtinPart);
+                
+                if (itemCode) {
+                    console.log('Found item code:', itemCode);
+                    handleItemCode(itemCode);
+                    return;
+                } else {
+                    alert(`條碼 ${gtinPart} (${scannedText}) 未在系統中登記`);
+                }
+            }
+        } 
+        // 檢查是否包含 GTIN 文本格式
+        else {
+            const gtinMatch = scannedText.match(/GTIN[:\s]*(\d+)/i);
+            if (gtinMatch) {
+                const gtin = gtinMatch[1];
+                console.log('Extracted GTIN from text:', gtin);
+                const itemCode = productIdMap.get(gtin);
+                
+                if (itemCode) {
+                    console.log('Found item code:', itemCode);
+                    handleItemCode(itemCode);
+                    return;
+                } else {
+                    alert(`條碼 ${gtin} (${scannedText}) 未在系統中登記`);
+                }
+            } else {
+                alert(`無法識別的 DataMatrix 格式: ${scannedText}`);
+                console.log('Unrecognized DataMatrix format:', scannedText);
+            }
+        }
+    } catch (error) {
+        console.error('DataMatrix 分析錯誤:', error);
+        alert('分析條碼時發生錯誤');
+    } finally {
+        hideLoading();
+        closeScanner();
+    }
+}
+function handleItemCode(itemCode) {
+    if (!itemCode) {
+        console.error('未提供項目代碼');
         return;
     }
 
     const selectedWard = document.getElementById('wardSelect').value;
     if (!selectedWard) {
-        alert('请先选择病房');
+        alert('請先選擇病房');
+        closeScanner();
         return;
     }
 
-    console.log('处理扫描结果:', scannedText);
-
-    // 根据条码类型进行处理
-    if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-        // 处理 DataMatrix 条码
-        handleDataMatrix(scannedText);
-    } else if (format === ZXing.BarcodeFormat.QR_CODE) {
-        // 处理 QR Code
-        handleQRCode(scannedText);
-    } else {
-        // 处理其他一维码类型
-        const normalizedText = normalizeBarcode(scannedText);
-        const itemCode = productIdMap.get(normalizedText);
-        if (itemCode) {
-            handleItemCode(itemCode);
-        } else {
-            alert(`条码 ${scannedText} 未在系统中登记`);
-        }
-    }
-}
-
-function normalizeBarcode(text) {
-    return text.toString().trim().toUpperCase();
-}
-
-function handleDataMatrix(scannedText) {
-    try {
-        console.log('分析 DataMatrix:', scannedText);
-
-        // 检查是否是 GS1 格式 (以 '01' 开头)
-        const match = scannedText.match(/01(\d{14})/);
-        if (match && match[1]) {
-            const gtinPart = match[1];
-            console.log('从 GS1 中提取的 GTIN:', gtinPart);
-            const itemCode = productIdMap.get(gtinPart);
-
-            if (itemCode) {
-                console.log('找到的 item code:', itemCode);
-                handleItemCode(itemCode);
-            } else {
-                alert(`条码 ${gtinPart} 未在系统中登记`);
-            }
-        } else {
-            alert(`无法识别的 DataMatrix 格式: ${scannedText}`);
-            console.log('无法识别的 DataMatrix 格式:', scannedText);
-        }
-    } catch (error) {
-        console.error('DataMatrix 分析错误:', error);
-        alert('分析条码时发生错误');
-    }
-}
-
-function handleQRCode(scannedText) {
-    console.log('QR Code 内容:', scannedText);
-    // 修改为匹配包含大写 F 标签的值
-    const match = scannedText.match(/<F>(.*?)<\/F>/i);
-    if (match && match[1]) {
-        const value = match[1];
-        console.log('在 F 标签中找到的值:', value);
-        document.getElementById('itemCodeFilter').value = value;
-        filterItemCodes();
-    } else {
-        alert('无法识别的 QR Code 格式');
-    }
-}
-
-function handleItemCode(itemCode) {
-    if (!itemCode) {
-        console.error('未提供项目代码');
-        return;
-    }
-
-    console.log('处理项目代码:', itemCode);
+    console.log('處理項目代碼:', itemCode);
     document.getElementById('itemCodeFilter').value = itemCode;
     filterItemCodes();
+    closeScanner();
 }
-
 
 
 
