@@ -1335,50 +1335,81 @@ console.log('Checking for GTIN format...');
 
 // Data Matrix handling
 if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-    console.log('Processing Data Matrix:', scannedText);
+    // 記錄原始掃描內容
+    console.log('Raw Data Matrix content:', scannedText);
     
-    // 先檢查是否包含 "GTIN" 文本
-    if (scannedText.includes('GTIN')) {
-        const gtinMatch = scannedText.match(/GTIN\s*(\d+)/i);
-        if (gtinMatch && gtinMatch[1]) {
-            const extractedNumber = gtinMatch[1];
-            console.log('Extracted GTIN from text:', extractedNumber);
-            const itemCode = productIdMap.get(extractedNumber);
+    try {
+        // 1. 先處理 GTIN 文本格式
+        if (scannedText.includes('GTIN')) {
+            const gtinMatch = scannedText.match(/GTIN\s*(\d+)/i);
+            if (gtinMatch && gtinMatch[1]) {
+                const extractedNumber = gtinMatch[1];
+                console.log('Extracted GTIN from text:', extractedNumber);
+                const itemCode = productIdMap.get(extractedNumber);
+                
+                if (itemCode) {
+                    console.log('Found matching item code:', itemCode);
+                    handleItemCode(itemCode);
+                    return;
+                } else {
+                    console.log('No matching item code found for GTIN:', extractedNumber);
+                    alert(`條碼內容(GTIN)：${extractedNumber} 未於系統登記`);
+                    closeScanner();
+                    return;
+                }
+            }
+        }
+        
+        // 2. 處理 GS1 格式
+        if (scannedText.startsWith('01')) {
+            const match = scannedText.match(/01(\d+?)(?=10|$)/);
+            if (match && match[1]) {
+                const extractedNumber = match[1];
+                console.log('Extracted GS1 number:', extractedNumber);
+                const itemCode = productIdMap.get(extractedNumber);
+                
+                if (itemCode) {
+                    console.log('Found matching item code:', itemCode);
+                    handleItemCode(itemCode);
+                    return;
+                } else {
+                    console.log('No matching item code found for GS1:', extractedNumber);
+                    alert(`條碼內容(GS1)：${scannedText} 未於系統登記`);
+                    closeScanner();
+                    return;
+                }
+            }
+        }
+        
+        // 3. 處理純數字格式
+        if (/^\d+$/.test(scannedText)) {
+            console.log('Processing numeric Data Matrix:', scannedText);
+            const itemCode = productIdMap.get(scannedText);
             
             if (itemCode) {
+                console.log('Found matching item code:', itemCode);
                 handleItemCode(itemCode);
                 return;
             } else {
-                alert(`條碼內容：GTIN ${extractedNumber} 未於系統登記`);
+                console.log('No matching item code found for number:', scannedText);
+                alert(`條碼內容(純數字)：${scannedText} 未於系統登記`);
                 closeScanner();
                 return;
             }
         }
+        
+        // 4. 如果都不符合上述格式，顯示原始內容
+        console.log('Unrecognized Data Matrix format');
+        alert(`未能識別的條碼格式：${scannedText}`);
+        closeScanner();
+        return;
+        
+    } catch (error) {
+        console.error('Error processing Data Matrix:', error);
+        alert('處理條碼時發生錯誤');
+        closeScanner();
+        return;
     }
-    
-    // 如果不是 GTIN 文本格式，檢查 GS1 格式
-    if (scannedText.startsWith('01')) {
-        const match = scannedText.match(/01(\d+?)(?=10|$)/);
-        if (match && match[1]) {
-            const extractedNumber = match[1];
-            console.log('Extracted GS1 number:', extractedNumber);
-            const itemCode = productIdMap.get(extractedNumber);
-            
-            if (itemCode) {
-                handleItemCode(itemCode);
-                return;
-            } else {
-                alert(`條碼內容：${scannedText} 未於系統登記`);
-                closeScanner();
-                return;
-            }
-        }
-    }
-    
-    // 顯示實際掃描到的內容
-    alert(`條碼內容：${scannedText} 未於系統登記`);
-    closeScanner();
-    return;
 }
                         
                         // 1D barcode handling (EAN-13, CODE-128)
