@@ -1270,6 +1270,8 @@ let model; // 全局变量，存储加载的模型
 let scanning = false; // 标记是否正在扫描
 
 async function startScanner() {
+    console.log('Starting scanner...');
+    
     const selectedWard = document.getElementById('wardSelect').value;
     if (!selectedWard) {
         alert('请先选择病房');
@@ -1284,6 +1286,7 @@ async function startScanner() {
     // 初始化 codeReader
     if (!codeReader) {
         codeReader = new ZXing.BrowserMultiFormatReader();
+        console.log('codeReader initialized');
     }
 
     // 加载 TensorFlow.js 模型
@@ -1300,6 +1303,7 @@ async function startScanner() {
 
     codeReader.getVideoInputDevices()
         .then(videoInputDevices => {
+            console.log('Video input devices:', videoInputDevices);
             // 选择后置摄像头
             const selectedDeviceId = videoInputDevices[0].deviceId;
 
@@ -1316,7 +1320,7 @@ async function startScanner() {
                 if (err && !(err instanceof ZXing.NotFoundException)) {
                     console.error(err);
                 }
-                // 不再在这里调用 detectFrame()
+                // 不在这里调用 detectFrame()
             });
 
             // 开始对象检测
@@ -1325,11 +1329,10 @@ async function startScanner() {
 
         })
         .catch(err => {
-            console.error(err);
+            console.error('Error getting video input devices:', err);
             alert('无法访问相机，请检查权限设置。');
         });
 }
-
 
 let lastDetectionTime = 0;
 const detectionInterval = 200; // 毫秒，200ms 即每秒 5 次
