@@ -1334,18 +1334,19 @@ console.log('Raw scanned text:', scannedText);
 console.log('Checking for GTIN format...');
 
 // Data Matrix handling
+// Data Matrix handling
 if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-    // 記錄原始掃描內容
     console.log('Raw Data Matrix content:', scannedText);
     
     try {
-        // 1. 先處理 GTIN 文本格式
+        // 1. 處理 GTIN 文本格式
         if (scannedText.includes('GTIN')) {
+            console.log('Processing GTIN text format');
             const gtinMatch = scannedText.match(/GTIN\s*(\d+)/i);
             if (gtinMatch && gtinMatch[1]) {
                 const extractedNumber = gtinMatch[1];
                 console.log('Extracted GTIN from text:', extractedNumber);
-                const itemCode = productIdMap.get(extractedNumber);
+                const itemCode = findMatchingItemCode(extractedNumber);
                 
                 if (itemCode) {
                     console.log('Found matching item code:', itemCode);
@@ -1353,7 +1354,7 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
                     return;
                 } else {
                     console.log('No matching item code found for GTIN:', extractedNumber);
-                    alert(`條碼內容(GTIN)：${extractedNumber} 未於系統登記`);
+                    alert(`條碼內容(GTIN文本)：${extractedNumber}\n未於系統登記`);
                     closeScanner();
                     return;
                 }
@@ -1362,11 +1363,12 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
         
         // 2. 處理 GS1 格式
         if (scannedText.startsWith('01')) {
-            const match = scannedText.match(/01(\d+?)(?=10|$)/);
+            console.log('Processing GS1 format');
+            const match = scannedText.match(/01(\d{8,14}?)(?=\d{2}\d|$)/);
             if (match && match[1]) {
                 const extractedNumber = match[1];
                 console.log('Extracted GS1 number:', extractedNumber);
-                const itemCode = productIdMap.get(extractedNumber);
+                const itemCode = findMatchingItemCode(extractedNumber);
                 
                 if (itemCode) {
                     console.log('Found matching item code:', itemCode);
@@ -1374,7 +1376,7 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
                     return;
                 } else {
                     console.log('No matching item code found for GS1:', extractedNumber);
-                    alert(`條碼內容(GS1)：${scannedText} 未於系統登記`);
+                    alert(`條碼內容(GS1)：${extractedNumber}\n未於系統登記`);
                     closeScanner();
                     return;
                 }
@@ -1383,8 +1385,8 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
         
         // 3. 處理純數字格式
         if (/^\d+$/.test(scannedText)) {
-            console.log('Processing numeric Data Matrix:', scannedText);
-            const itemCode = productIdMap.get(scannedText);
+            console.log('Processing numeric format');
+            const itemCode = findMatchingItemCode(scannedText);
             
             if (itemCode) {
                 console.log('Found matching item code:', itemCode);
@@ -1392,25 +1394,27 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
                 return;
             } else {
                 console.log('No matching item code found for number:', scannedText);
-                alert(`條碼內容(純數字)：${scannedText} 未於系統登記`);
+                alert(`條碼內容(純數字)：${scannedText}\n未於系統登記`);
                 closeScanner();
                 return;
             }
         }
         
-        // 4. 如果都不符合上述格式，顯示原始內容
-        console.log('Unrecognized Data Matrix format');
-        alert(`未能識別的條碼格式：${scannedText}`);
+        // 4. 其他未識別格式
+        console.log('Unrecognized Data Matrix format:', scannedText);
+        alert(`未能識別的條碼格式：${scannedText}\n請確認是否為正確的商品條碼`);
         closeScanner();
         return;
         
     } catch (error) {
         console.error('Error processing Data Matrix:', error);
-        alert('處理條碼時發生錯誤');
+        console.error('Error details:', error.message);
+        alert('處理條碼時發生錯誤，請再試一次');
         closeScanner();
         return;
     }
 }
+
                         
                         // 1D barcode handling (EAN-13, CODE-128)
                         else if (format === ZXing.BarcodeFormat.EAN_13 || 
@@ -1544,6 +1548,7 @@ async function handleDataMatrix(scannedText) {
         closeScanner();
     }
 }
+
 function handleItemCode(itemCode) {
     if (!itemCode) {
         console.error('No item code provided');
@@ -1556,7 +1561,29 @@ function handleItemCode(itemCode) {
         closeScanner();
         return;
     }
-
+function findMatchingItemCode(number) {
+    console.log('Searching for matching item code:', number);
+    console.log('Number length:', number.length);
+    
+    // 直接匹配
+    let itemCode = productIdMap.get(number);
+    if (itemCode) {
+        console.log('Found direct match');
+        return itemCode;
+    }
+    
+    // 嘗試右對齊匹配
+    for (let [key, value] of productIdMap) {
+        if (key.endsWith(number) || number.endsWith(key)) {
+            console.log('Found match by end digits. Key:', key);
+            return value;
+        }
+    }
+    
+    // 記錄可用的 keys 以助調試
+    console.log('Available keys in productIdMap:', Array.from(productIdMap.keys()));
+    return null;
+}
     console.log('Processing item code:', itemCode);
     document.getElementById('itemCodeFilter').value = itemCode;
     filterItemCodes();
