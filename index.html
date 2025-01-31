@@ -14,6 +14,28 @@
 
 
     <style>
+.scan-result {
+    padding: 10px;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+    margin-top: 15px;
+    min-height: 60px;
+}
+
+.scanner-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 400px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
 
 .animate-spin {
     animation: spin 1s linear infinite;
@@ -450,6 +472,10 @@ button:disabled {
         <div id="scanner-container">
             <video id="scanner-video" playsinline></video>
             <div class="scanner-overlay"></div>
+        </div>
+        <!-- 新增掃描結果顯示區域 -->
+        <div id="scan-result" class="scan-result">
+            <div class="location-value" style="margin-top: 20px; font-size: 16px;"></div>
         </div>
     </div>
 </div>
@@ -1252,6 +1278,9 @@ function startScanner() {
         return;
     }
 
+    document.getElementById('itemCodeFilter').value = '';
+    filterItemCodes(); // 重置過濾結果
+
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
     modal.style.display = 'block';
@@ -1340,12 +1369,8 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
             const itemCode = productIdMap.get(productId);
             
             if (itemCode) {
-                handleItemCode(itemCode);
-            } else {
-                alert(`未找到對應商品代碼\n掃描內容：${productId}`);
+                23:25 31/1/2025 
             }
-        } else {
-            alert(`無法提取完整15位數字\n當前內容：${cleanText}`);
         }
     } catch (error) {
         console.error('處理錯誤:', error);
@@ -1498,13 +1523,28 @@ function handleItemCode(itemCode) {
         return;
     }
 
-    console.log('處理商品代碼:', itemCode);
-    document.getElementById('itemCodeFilter').value = itemCode;
-    filterItemCodes();
+    // 查找物品位置
+    const found = data.find(row => 
+        row.ward === selectedWard && 
+        row.itemCode.toString() === itemCode.toString()
+    );
+
+    // 獲取掃描結果顯示區域
+    const scanResult = document.querySelector('#scan-result .location-value');
     
-        
-    closeScanner();
+    if (found) {
+        // 顯示位置資訊
+        scanResult.innerHTML = `
+            <div style="margin-bottom: 10px;">
+                <strong>Item Code:</strong> ${found.itemCode}<br>
+                <strong>Location:</strong> ${found.location || 'N/A'}
+            </div>
+        `;
+    } else {
+        scanResult.innerHTML = `<div style="color: red;">No location found for item ${itemCode}</div>`;
+    }
 }
+
 
 
 </script>
