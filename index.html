@@ -1484,6 +1484,7 @@ async function handleDataMatrix(scannedText) {
 function handleItemCode(itemCode) {
     if (!itemCode) {
         alert('未提供商品代碼');
+        closeScanner();
         return;
     }
 
@@ -1494,14 +1495,25 @@ function handleItemCode(itemCode) {
         return;
     }
 
+    // 檢查該 itemCode 是否屬於所選擇的病房
+    const isItemInWard = data.some(row => 
+        row.ward === selectedWard && 
+        row.itemCode.toString() === itemCode.toString()
+    );
+
+    if (!isItemInWard) {
+        alert(`此Item (${itemCode}) 不屬於 ${selectedWard} 的 Ward Stock Item`);
+        closeScanner();
+        return;
+    }
+
     console.log('處理商品代碼:', itemCode);
     document.getElementById('itemCodeFilter').value = itemCode;
     filterItemCodes();
-    
-   
-    
     closeScanner();
 }
+
+
 
 
 </script>
