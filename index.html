@@ -1331,34 +1331,46 @@ console.log('Checking for GTIN format...');
 
 // Data Matrix handling
 if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-    console.log('Raw Data Matrix:', scannedText);
-    
     try {
-        // 如果掃描內容是以 01 開頭
-        if (scannedText.startsWith('01')) {
+        // 移除所有空格
+        let cleanText = scannedText.replace(/\s+/g, '');
+        alert(`原始掃描內容：${cleanText}`);  // 顯示原始掃描內容
+        
+        // 檢查開頭字符
+        const firstTwoChars = cleanText.substring(0, 2);
+        alert(`開頭兩個字符：${firstTwoChars}`);  // 顯示開頭兩個字符
+        
+        // 修改判斷邏輯，更寬鬆的檢查
+        if (cleanText.indexOf('01') === 0 || cleanText.toLowerCase().indexOf('01') === 0) {
             // 只保留數字
-            let processedCode = scannedText.replace(/[^0-9]/g, '');
-            // 取前 15 位
-            let productId = processedCode.substring(0, 15);
+            let numericOnly = cleanText.replace(/[^0-9]/g, '');
+            alert(`只保留數字：${numericOnly}`);  // 顯示數字內容
+            
+            // 取前15位
+            let productId = numericOnly.substring(0, 15);
+            alert(`取得前15位：${productId}`);  // 顯示處理後的15位數字
             
             // 在 productIdMap 中查找對應的 item code
             const itemCode = productIdMap.get(productId);
             
             if (itemCode) {
+                alert(`找到對應的商品代碼：${itemCode}`);  // 顯示找到的商品代碼
                 handleItemCode(itemCode);
                 return;
             } else {
-                alert(`條碼內容：${productId} 未於系統登記`);
+                alert(`條碼內容：${productId}\n未在系統中找到對應項目`);
             }
         } else {
-            alert('無效的條碼格式（需以01開頭）');
+            alert(`條碼必須以01開頭\n當前開頭：${firstTwoChars}`);
         }
     } catch (error) {
-        alert('處理條碼時發生錯誤');
+        alert(`處理錯誤：${error.message}`);
     } finally {
         closeScanner();
     }
-}                        // 1D barcode handling (EAN-13, CODE-128)
+}
+
+          // 1D barcode handling (EAN-13, CODE-128)
                         else if (format === ZXing.BarcodeFormat.EAN_13 || 
                                 format === ZXing.BarcodeFormat.CODE_128) {
                             const normalizedText = normalizeBarcode(scannedText);
