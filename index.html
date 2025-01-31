@@ -1332,28 +1332,16 @@ console.log('Checking for GTIN format...');
 // Data Matrix handling
 if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
     try {
-        // 移除所有空格和非数字字符
-        let cleanText = scannedText.replace(/[^0-9]/g, '');
-        alert(`原始掃描內容：${cleanText}`);
+        let productId = scannedText.substring(0, 15);
+        alert(`提取的前 15 位：${productId}`);
         
-        // 检查是否以 01 开头
-        if (cleanText.startsWith('01')) {
-            // 直接取前 15 位
-            let productId = cleanText.substring(0, 15);
-            alert(`提取的前 15 位：${productId}`);
-            
-            // 在 productIdMap 中查找对应的 item code
-            const itemCode = productIdMap.get(productId);
-            
-            if (itemCode) {
-                alert(`找到對應的商品代碼：${itemCode}`);
-                handleItemCode(itemCode);
-                return;
-            } else {
-                alert(`條碼內容：${productId}\n未在系統中找到對應項目`);
-            }
+        // 直接在 productIdMap 中查找對應的 item code
+        const itemCode = productIdMap.get(productId);
+        
+        if (itemCode) {
+            handleItemCode(itemCode);
         } else {
-            alert(`條碼必須以 01 開頭\n當前內容：${cleanText}`);
+            alert(`未找到對應商品代碼\n掃描內容：${productId}`);
         }
     } catch (error) {
         alert(`處理錯誤：${error.message}`);
