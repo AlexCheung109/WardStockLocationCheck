@@ -709,7 +709,8 @@ async function loadProductIds() {
             }
         });
         
-        console.log('Product ID mapping loaded:', productIdMap.size, 'entries');
+console.log('Product ID mapping loaded:', productIdMap.size, 'entries');
+console.log('Sample Product IDs:', Array.from(productIdMap.keys()).slice(0, 10)); // 顯示前10個 productId
         
     } catch (error) {
         console.error('Error loading product IDs:', error);
@@ -1335,23 +1336,23 @@ console.log('Checking for GTIN format...');
 
 // Data Matrix handling
 if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-    // Record original scan for debugging
     console.log('Raw Data Matrix content:', scannedText);
     
     try {
-        // Take first 15 characters only
-        const first15Chars = scannedText.substring(0, 16);
+        // 假設 productId 是15個字符，並去除前後空白
+        const first15Chars = scannedText.substring(0, 15).trim();
         console.log('First 15 characters:', first15Chars);
         
-        // Lookup in product ID mapping
-        const itemCode = productIdMap.get(first15Chars);
-        
-        if (itemCode) {
+        // 檢查 productIdMap 中是否存在該鍵
+        if (productIdMap.has(first15Chars)) {
+            const itemCode = productIdMap.get(first15Chars);
             console.log('Found matching item code:', itemCode);
             handleItemCode(itemCode);
             return;
         } else {
             console.log('No matching item code found for:', first15Chars);
+            // 比對所有 productId 以檢查是否存在相似條碼
+            console.log('Available product IDs:', Array.from(productIdMap.keys()));
             alert(`條碼內容：${first15Chars} 未於系統登記`);
             closeScanner();
             return;
@@ -1362,8 +1363,7 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
         closeScanner();
         return;
     }
-}
-       
+}       
                         // 1D barcode handling (EAN-13, CODE-128)
                         else if (format === ZXing.BarcodeFormat.EAN_13 || 
                                 format === ZXing.BarcodeFormat.CODE_128) {
