@@ -1330,43 +1330,52 @@ async function scanBarcodes() {
                         const scannedText = result.text;
                         const format = result.getBarcodeFormat();
                         console.log('Barcode detected:', format, scannedText);
-
-console.log('Raw scanned text:', scannedText);
-console.log('Checking for GTIN format...');
-
-// Data Matrix handling
-if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-    console.log('Raw Data Matrix content:', scannedText);
     
-    try {
-        // 假設 productId 是15個字符，並去除前後空白
-        const first15Chars = scannedText.substring(0, 15).trim();
-        console.log('First 15 characters:', first15Chars);
-        
-        // 檢查 productIdMap 中是否存在該鍵
-        if (productIdMap.has(first15Chars)) {
-            const itemCode = productIdMap.get(first15Chars);
-            console.log('Found matching item code:', itemCode);
-            handleItemCode(itemCode);
-            return;
-        } else {
-            console.log('No matching item code found for:', first15Chars);
-            // 比對所有 productId 以檢查是否存在相似條碼
-            console.log('Available product IDs:', Array.from(productIdMap.keys()));
-            alert(`條碼內容：${first15Chars} 未於系統登記`);
-            closeScanner();
-            return;
-        }
-    } catch (error) {
-        console.error('Error processing Data Matrix:', error);
-        alert('處理條碼時發生錯誤');
-        closeScanner();
-        return;
-    }
-}       
+                        // Data Matrix handling
+                        if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
+                            console.log('Raw Data Matrix content:', scannedText);
+                            
+                            try {
+                                // 去除所有非數字字符
+                                const cleanedScannedText = scannedText.trim().replace(/\D/g, '');
+                                console.log('Cleaned scanned text (digits only):', cleanedScannedText);
+                                console.log('Length of cleaned scanned text:', cleanedScannedText.length);
+                                
+                                // 確認是否為 15 位數字
+                                if (cleanedScannedText.length !== 15) {
+                                    console.warn(`Scanned text length is ${cleanedScannedText.length} digits, expected 15 digits.`);
+                                    alert(`掃描的條碼內容長度為 ${cleanedScannedText.length} 位，預期為 15 位。`);
+                                    closeScanner();
+                                    return;
+                                }
+                                
+                                const productId = cleanedScannedText;
+                                console.log('Parsed 15-digit productId:', productId);
+                                
+                                if (productIdMap.has(productId)) {
+                                    const itemCode = productIdMap.get(productId);
+                                    console.log('Found matching item code:', itemCode);
+                                    handleItemCode(itemCode);
+                                    return;
+                                } else {
+                                    console.log('No matching item code found for:', productId);
+                                    console.log('Available product IDs:', Array.from(productIdMap.keys()));
+                                    alert(`條碼內容：${productId} 未於系統登記`);
+                                    closeScanner();
+                                    return;
+                                }
+                            } catch (error) {
+                                console.error('Error processing Data Matrix:', error);
+                                alert('處理條碼時發生錯誤');
+                                closeScanner();
+                                return;
+                            }
+                        }
                         // 1D barcode handling (EAN-13, CODE-128)
-                        else if (format === ZXing.BarcodeFormat.EAN_13 || 
-                                format === ZXing.BarcodeFormat.CODE_128) {
+                        else if (
+                            format === ZXing.BarcodeFormat.EAN_13 || 
+                            format === ZXing.BarcodeFormat.CODE_128
+                        ) {
                             const normalizedText = normalizeBarcode(scannedText);
                             const itemCode = productIdMap.get(normalizedText);
                             if (itemCode) {
@@ -1386,8 +1395,8 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
                 }
             } catch (error) {
                 console.error('General scanning error:', error);
-    console.log('Scanning state:', scanning);
-    console.log('Video state:', video.readyState);
+                console.log('Scanning state:', scanning);
+                console.log('Video state:', video.readyState);
             }
         }
 
