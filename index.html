@@ -1252,10 +1252,6 @@ function startScanner() {
         return;
     }
 
-   // 清除上次的紀錄
-    document.getElementById('itemCodeFilter').value = '';
-    filterItemCodes(); // 重置過濾結果
-
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
     modal.style.display = 'block';
@@ -1502,7 +1498,8 @@ function handleItemCode(itemCode) {
     document.getElementById('itemCodeFilter').value = itemCode;
     filterItemCodes();
     
-   
+    // 新增成功提示
+    alert(`成功掃描到商品代碼: ${itemCode}`);
     
     closeScanner();
 }
