@@ -1335,15 +1335,23 @@ console.log('Checking for GTIN format...');
 
 // Data Matrix handling
 if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-    // Record original scan for debugging
     console.log('Raw Data Matrix content:', scannedText);
     
     try {
-        // Take first 15 characters only
-        const first15Chars = scannedText.replace(/\s+/g, '').substring(0, 15);
-        console.log('First 15 characters:', first15Chars);
+        // 1. 移除所有空格
+        let cleanText = scannedText.replace(/\s+/g, '');
+        console.log('Clean text:', cleanText, 'Length:', cleanText.length);
         
-        // Lookup in product ID mapping
+        // 2. 只取前15位數字
+        const first15Chars = cleanText.slice(0, 15);
+        console.log('First 15 chars:', first15Chars, 'Length:', first15Chars.length);
+        
+        // 3. 檢查是否符合預期格式
+        if (first15Chars === '012345678901234') {
+            console.log('Matches expected format');
+        }
+        
+        // 4. 查找對應的 item code
         const itemCode = productIdMap.get(first15Chars);
         
         if (itemCode) {
@@ -1362,8 +1370,7 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
         closeScanner();
         return;
     }
-}
-       
+}       
                         // 1D barcode handling (EAN-13, CODE-128)
                         else if (format === ZXing.BarcodeFormat.EAN_13 || 
                                 format === ZXing.BarcodeFormat.CODE_128) {
