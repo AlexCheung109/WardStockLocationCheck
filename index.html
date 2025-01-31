@@ -1252,6 +1252,10 @@ function startScanner() {
         return;
     }
 
+   // 清除上次的紀錄
+    document.getElementById('itemCodeFilter').value = '';
+    filterItemCodes(); // 重置過濾結果
+
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
     modal.style.display = 'block';
@@ -1340,7 +1344,7 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
             const itemCode = productIdMap.get(productId);
             
             if (itemCode) {
-                processItemCode(itemCode); 
+                handleItemCode(itemCode);
             }
         }
     } catch (error) {
