@@ -1340,7 +1340,7 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
             const itemCode = productIdMap.get(productId);
             
             if (itemCode) {
-                handleItemCode(itemCode);
+                processItemCode(itemCode); 
             }
         }
     } catch (error) {
