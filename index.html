@@ -1335,34 +1335,39 @@ console.log('Checking for GTIN format...');
 
 // Data Matrix handling
 if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-    console.log('Raw Data Matrix content:', scannedText);
+    console.log('Raw Data Matrix content:', scannedText); // 01189011750295771726103110pt0424132a21ps3akcm5r3fsspf
     
     try {
-        // 1. 移除所有空格
-        let cleanText = scannedText.replace(/\s+/g, '');
-        console.log('Clean text:', cleanText, 'Length:', cleanText.length);
-        
-        // 2. 只取前15位數字
-        const first15Chars = cleanText.slice(0, 15);
-        console.log('First 15 chars:', first15Chars, 'Length:', first15Chars.length);
-        
-        // 3. 檢查是否符合預期格式
-        if (first15Chars === '012345678901234') {
-            console.log('Matches expected format');
-        }
-        
-        // 4. 查找對應的 item code
-        const itemCode = productIdMap.get(first15Chars);
-        
-        if (itemCode) {
-            console.log('Found matching item code:', itemCode);
-            handleItemCode(itemCode);
-            return;
-        } else {
-            console.log('No matching item code found for:', first15Chars);
-            alert(`條碼內容：${first15Chars} 未於系統登記`);
-            closeScanner();
-            return;
+        // 1. 如果掃描到的是GS1格式的DataMatrix (以01開頭)
+        if (scannedText.startsWith('01')) {
+            // 2. 從01後面取得15位數字
+            const gs1Pattern = /^01(\d{14})/;  // GS1格式，01後面接14位數字
+            const match = scannedText.match(gs1Pattern);
+            
+            if (match) {
+                // 3. 組合完整的15位數字 (包含開頭的01)
+                const first15Chars = '01' + match[1].substring(2);
+                console.log('Extracted 15 chars:', first15Chars, 'Length:', first15Chars.length);
+                
+                // 4. 查找對應的 item code
+                const itemCode = productIdMap.get(first15Chars);
+                
+                if (itemCode) {
+                    console.log('Found matching item code:', itemCode);
+                    handleItemCode(itemCode);
+                    return;
+                } else {
+                    console.log('No matching item code found for:', first15Chars);
+                    alert(`條碼內容：${first15Chars} 未於系統登記`);
+                    closeScanner();
+                    return;
+                }
+            } else {
+                console.log('GS1 pattern not matched in:', scannedText);
+                alert('無效的GS1格式條碼');
+                closeScanner();
+                return;
+            }
         }
     } catch (error) {
         console.error('Error processing Data Matrix:', error);
@@ -1370,8 +1375,7 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
         closeScanner();
         return;
     }
-}       
-                        // 1D barcode handling (EAN-13, CODE-128)
+}                        // 1D barcode handling (EAN-13, CODE-128)
                         else if (format === ZXing.BarcodeFormat.EAN_13 || 
                                 format === ZXing.BarcodeFormat.CODE_128) {
                             const normalizedText = normalizeBarcode(scannedText);
