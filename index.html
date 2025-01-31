@@ -685,9 +685,7 @@ async function loadProductIds() {
     try {
         const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Product_ID.xlsx';
         const response = await fetch(excelUrl);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
         const arrayBuffer = await response.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
@@ -702,10 +700,33 @@ async function loadProductIds() {
         // 清空當前的 Map
         productIdMap.clear();
         
-        // 將 productId 作為 key，itemCode 作為 value 存入 Map
+        // 建立反向映射（多對一的關係）
+        const reverseMap = new Map();
+        
         productData.forEach(row => {
             if (row.productId && row.itemCode) {
-                productIdMap.set(row.productId.toString().trim(), row.itemCode.toString().trim());
+                const productId = row.productId.toString().trim();
+                const itemCode = row.itemCode.toString().trim();
+                
+                // 如果已經存在這個 productId，將新的 itemCode 加入陣列
+                if (reverseMap.has(productId)) {
+                    const existing = reverseMap.get(productId);
+                    if (!existing.includes(itemCode)) {
+                        existing.push(itemCode);
+                    }
+                } else {
+                    reverseMap.set(productId, [itemCode]);
+                }
+            }
+        });
+        
+        // 將反向映射轉換為正向映射
+        reverseMap.forEach((itemCodes, productId) => {
+            productIdMap.set(productId, itemCodes[0]); // 使用第一個 itemCode
+            
+            // 如果有多個 itemCode，記錄在 console
+            if (itemCodes.length > 1) {
+                console.log(`Product ID ${productId} has multiple item codes:`, itemCodes);
             }
         });
         
@@ -713,7 +734,7 @@ async function loadProductIds() {
         
     } catch (error) {
         console.error('Error loading product IDs:', error);
-        document.getElementById('error').textContent = 'Error loading product IDs: ' + error.message;
+        alert('Error loading product IDs: ' + error.message);
     }
 }
 
@@ -1335,55 +1356,58 @@ console.log('Checking for GTIN format...');
 
 // Data Matrix handling
 if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-    console.log('======= Data Matrix Scan Debug =======');
-    console.log('Raw Data Matrix:', scannedText);
+    console.log('===== Data Matrix Scan Debug =====');
+    console.log('Raw scan:', scannedText);
     
     try {
-        // 移除所有空格
-        let cleanText = scannedText.replace(/\s+/g, '');
-        console.log('Cleaned text:', cleanText);
-        
-        // 如果是以 01 開頭
-        if (cleanText.startsWith('01')) {
-            // 直接取前 15 位
-            const first15 = cleanText.substring(0, 15);
-            console.log('Extracted 15 digits:', first15);
+        // 檢查是否以 "01" 開頭
+        if (scannedText.startsWith('01')) {
+            // 精確取得前 15 位數字
+            const targetLength = 15;
+            let processedCode = scannedText;
             
-            // 檢查是否為數字且長度正確
-            if (/^\d{15}$/.test(first15)) {
-                console.log('Valid 15-digit number found');
-                
+            // 使用正則表達式只保留數字
+            processedCode = processedCode.replace(/[^0-9]/g, '');
+            
+            // 取得前 15 位數字
+            const first15 = processedCode.substring(0, targetLength);
+            
+            console.log('Processed code:', first15);
+            console.log('Length:', first15.length);
+            
+            // 驗證長度
+            if (first15.length === targetLength) {
                 // 查找對應的 item code
                 const itemCode = productIdMap.get(first15);
-                console.log('Looking up item code for:', first15);
-                console.log('Found item code:', itemCode);
                 
                 if (itemCode) {
-                    console.log('Successfully found item code');
+                    console.log('Found matching item code:', itemCode);
                     handleItemCode(itemCode);
                 } else {
-                    console.log('No item code found in mapping');
-                    alert(`條碼內容：${first15} 未於系統登記`);
+                    // 同時顯示在螢幕上和 console
+                    const message = `掃描到的條碼：${first15}\n但未在系統中找到對應項目`;
+                    alert(message);
+                    console.log(message);
                 }
             } else {
-                console.log('Invalid number format');
-                alert('無效的條碼格式');
+                const message = `條碼格式不正確：需要 ${targetLength} 位數字，但得到 ${first15.length} 位`;
+                alert(message);
+                console.log(message);
             }
         } else {
-            console.log('Code does not start with 01');
-            alert('條碼格式不正確（需以01開頭）');
+            const message = '條碼必須以 01 開頭';
+            alert(message);
+            console.log(message);
         }
     } catch (error) {
-        console.error('Processing error:', error);
+        console.error('Data Matrix 處理錯誤:', error);
         alert('處理條碼時發生錯誤');
     } finally {
-        console.log('======= Debug End =======');
+        console.log('===== Debug End =====');
         closeScanner();
     }
-}
-
-
-                    // 1D barcode handling (EAN-13, CODE-128)
+}     
+                        // 1D barcode handling (EAN-13, CODE-128)
                         else if (format === ZXing.BarcodeFormat.EAN_13 || 
                                 format === ZXing.BarcodeFormat.CODE_128) {
                             const normalizedText = normalizeBarcode(scannedText);
@@ -1517,23 +1541,26 @@ async function handleDataMatrix(scannedText) {
 }
 function handleItemCode(itemCode) {
     if (!itemCode) {
-        console.error('No item code provided');
+        alert('未提供商品代碼');
         return;
     }
 
     const selectedWard = document.getElementById('wardSelect').value;
     if (!selectedWard) {
-        alert('Please select a ward first');
+        alert('請先選擇病房');
         closeScanner();
         return;
     }
 
-    console.log('Processing item code:', itemCode);
+    console.log('處理商品代碼:', itemCode);
     document.getElementById('itemCodeFilter').value = itemCode;
     filterItemCodes();
+    
+    // 新增成功提示
+    alert(`成功掃描到商品代碼: ${itemCode}`);
+    
     closeScanner();
 }
-
 
 
 </script>
