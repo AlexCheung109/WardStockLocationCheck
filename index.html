@@ -1336,16 +1336,13 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
         let cleanText = scannedText.replace(/\s+/g, '');
         alert(`原始掃描內容：${cleanText}`);
         
-        // 判斷掃描內容是否符合 GS1 格式 (以 01 開頭加上數字)
-        if (cleanText.match(/^01\d+/)) {
-            // 從 01 後開始取得接下來的 14 位數字
-            let matches = cleanText.match(/^01(\d{14})/);
+        // 直接取前 15 位數字
+        if (cleanText.startsWith('01')) {
+            let productId = cleanText.substring(0, 15);
+            alert(`提取的 15 位數字：${productId}`);
             
-            if (matches && matches[1]) {
-                // 組合完整的 15 位數字 (包含開頭的 01)
-                let productId = '01' + matches[1];
-                alert(`處理後的 15 位數字：${productId}`);
-                
+            // 確認長度是否正確
+            if (productId.length === 15) {
                 // 在 productIdMap 中查找對應的 item code
                 const itemCode = productIdMap.get(productId);
                 
@@ -1357,10 +1354,10 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
                     alert(`條碼內容：${productId}\n未在系統中找到對應項目`);
                 }
             } else {
-                alert('無法取得完整的 14 位數字');
+                alert(`提取的數字長度不正確：${productId.length} (應為 15)`);
             }
         } else {
-            alert('條碼格式不正確（需以 01 開頭加上數字）');
+            alert('條碼必須以 01 開頭');
         }
     } catch (error) {
         alert(`處理錯誤：${error.message}`);
