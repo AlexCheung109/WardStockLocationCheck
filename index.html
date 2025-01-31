@@ -1333,29 +1333,21 @@ console.log('Checking for GTIN format...');
 if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
     try {
         let cleanText = scannedText.replace(/[^0-9]/g, '');
-        alert(`完整掃描內容：${cleanText}`);
-        
-        // 使用正則表達式找出以01開頭的前15位
         let match = cleanText.match(/^01\d{13}/);
+        
         if (match) {
             let productId = match[0];
-            alert(`提取的15位數字：${productId}`);
-            
             const itemCode = productIdMap.get(productId);
+            
             if (itemCode) {
                 handleItemCode(itemCode);
-            } else {
-                alert(`未找到對應商品代碼\n掃描內容：${productId}`);
             }
-        } else {
-            alert(`無法提取完整15位數字\n當前內容：${cleanText}`);
         }
     } catch (error) {
-        alert(`處理錯誤：${error.message}`);
+        console.error('處理錯誤:', error);
     } finally {
         closeScanner();
     }
-}
           // 1D barcode handling (EAN-13, CODE-128)
                         else if (format === ZXing.BarcodeFormat.EAN_13 || 
                                 format === ZXing.BarcodeFormat.CODE_128) {
