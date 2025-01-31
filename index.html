@@ -1341,7 +1341,11 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
             
             if (itemCode) {
                 handleItemCode(itemCode);
+            } else {
+                alert(`未找到對應商品代碼\n掃描內容：${productId}`);
             }
+        } else {
+            alert(`無法提取完整15位數字\n當前內容：${cleanText}`);
         }
     } catch (error) {
         console.error('處理錯誤:', error);
