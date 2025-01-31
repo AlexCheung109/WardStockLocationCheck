@@ -1339,20 +1339,31 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
     console.log('Raw Data Matrix content:', scannedText);
     
     try {
-        // Take first 15 characters only
-        const first15Chars = scannedText.substring(0, 15);
-        console.log('First 15 characters:', first15Chars);
+        // Remove any whitespace and non-printable characters
+        const cleanedText = scannedText.trim().replace(/\s+/g, '');
+        console.log('Cleaned text:', cleanedText);
         
-        // Lookup in product ID mapping
-        const itemCode = productIdMap.get(first15Chars);
+        // Take first 14 or 15 characters
+        const extractedDigits = cleanedText.substring(0, 14); // Changed to 14
+        console.log('Extracted digits:', extractedDigits);
+        
+        // Try to find matching item code
+        let itemCode = productIdMap.get(extractedDigits);
+        
+        // If no match found with 14 digits, try padding to 15 digits
+        if (!itemCode && extractedDigits.length === 14) {
+            const paddedDigits = extractedDigits + '0';
+            itemCode = productIdMap.get(paddedDigits);
+            console.log('Trying padded digits:', paddedDigits);
+        }
         
         if (itemCode) {
             console.log('Found matching item code:', itemCode);
             handleItemCode(itemCode);
             return;
         } else {
-            console.log('No matching item code found for:', first15Chars);
-            alert(`條碼內容：${first15Chars} 未於系統登記`);
+            console.log('No matching item code found for:', extractedDigits);
+            alert(`條碼內容：${extractedDigits} 未於系統登記`);
             closeScanner();
             return;
         }
@@ -1362,7 +1373,7 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
         closeScanner();
         return;
     }
-}                        
+}                 
                         // 1D barcode handling (EAN-13, CODE-128)
                         else if (format === ZXing.BarcodeFormat.EAN_13 || 
                                 format === ZXing.BarcodeFormat.CODE_128) {
