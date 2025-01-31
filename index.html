@@ -1252,9 +1252,6 @@ function startScanner() {
         return;
     }
 
-    document.getElementById('itemCodeFilter').value = '';
-    filterItemCodes(); // 重置過濾結果
-
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
     modal.style.display = 'block';
@@ -1505,8 +1502,6 @@ function handleItemCode(itemCode) {
     
     closeScanner();
 }
-
-
 
 
 </script>
