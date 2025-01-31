@@ -1332,16 +1332,23 @@ console.log('Checking for GTIN format...');
 // Data Matrix handling
 if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
     try {
-        let productId = scannedText.substring(0, 15);
-        alert(`提取的前 15 位：${productId}`);
+        let cleanText = scannedText.replace(/[^0-9]/g, '');
+        alert(`完整掃描內容：${cleanText}`);
         
-        // 直接在 productIdMap 中查找對應的 item code
-        const itemCode = productIdMap.get(productId);
-        
-        if (itemCode) {
-            handleItemCode(itemCode);
+        // 使用正則表達式找出以01開頭的前15位
+        let match = cleanText.match(/^01\d{13}/);
+        if (match) {
+            let productId = match[0];
+            alert(`提取的15位數字：${productId}`);
+            
+            const itemCode = productIdMap.get(productId);
+            if (itemCode) {
+                handleItemCode(itemCode);
+            } else {
+                alert(`未找到對應商品代碼\n掃描內容：${productId}`);
+            }
         } else {
-            alert(`未找到對應商品代碼\n掃描內容：${productId}`);
+            alert(`無法提取完整15位數字\n當前內容：${cleanText}`);
         }
     } catch (error) {
         alert(`處理錯誤：${error.message}`);
