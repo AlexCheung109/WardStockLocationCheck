@@ -1335,51 +1335,24 @@ console.log('Checking for GTIN format...');
 
 // Data Matrix handling
 if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
+    // Record original scan for debugging
     console.log('Raw Data Matrix content:', scannedText);
     
     try {
-        // Clean and normalize the scanned text
-        const cleanedText = scannedText.trim().replace(/\s+/g, '');
-        console.log('Cleaned text:', cleanedText);
+        // Take first 15 characters only
+        const first15Chars = scannedText.substring(0, 15);
+        console.log('First 15 characters:', first15Chars);
         
-        if (cleanedText.startsWith('01')) {
-            // Get digits after "01" prefix
-            const searchDigits = cleanedText.substring(2);
-            console.log('Searching digits:', searchDigits);
-            
-            // Convert both the search term and stored values to strings
-            // and ensure we're comparing in the same format
-            let found = false;
-            for (let [key, value] of productIdMap.entries()) {
-                // Convert both to strings and remove any whitespace
-                const normalizedKey = String(key).trim();
-                const normalizedSearchDigits = String(searchDigits).trim();
-                
-                console.log('Comparing:', {
-                    searchDigits: normalizedSearchDigits,
-                    mapKey: normalizedKey,
-                    original: key
-                });
-                
-                if (normalizedKey === normalizedSearchDigits || 
-                    normalizedKey === cleanedText) {
-                    console.log('Match found:', value);
-                    handleItemCode(value);
-                    found = true;
-                    break;
-                }
-            }
-            
-            if (!found) {
-                console.log('No match found in productIdMap');
-                alert(`條碼內容：${cleanedText} 未於系統登記`);
-            }
-            
-            closeScanner();
+        // Lookup in product ID mapping
+        const itemCode = productIdMap.get(first15Chars);
+        
+        if (itemCode) {
+            console.log('Found matching item code:', itemCode);
+            handleItemCode(itemCode);
             return;
         } else {
-            console.log('Invalid format - does not start with 01');
-            alert('不支援的條碼格式');
+            console.log('No matching item code found for:', first15Chars);
+            alert(`條碼內容：${first15Chars} 未於系統登記`);
             closeScanner();
             return;
         }
