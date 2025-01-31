@@ -65,13 +65,12 @@ button:disabled {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 60%; /* Reduced from 80% */
-    height: 40%; /* Reduced from 60% */
+    width: 80%;
+    height: 60%;
     border: 2px solid #4CAF50;
     border-radius: 10px;
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
 }
-
 
 
 
@@ -286,25 +285,10 @@ button:disabled {
 }
 
 .close-button {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: #ff4444;
-    color: white;
+    background: none;
     border: none;
-    border-radius: 50%;
-    width: 36px;
-    height: 36px;
-    font-size: 20px;
+    font-size: 24px;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-
-.close-button:hover {
-    background: #ff0000;
 }
 
 #scanner-container {
@@ -709,8 +693,7 @@ async function loadProductIds() {
             }
         });
         
-console.log('Product ID mapping loaded:', productIdMap.size, 'entries');
-console.log('Sample Product IDs:', Array.from(productIdMap.keys()).slice(0, 10)); // 顯示前10個 productId
+        console.log('Product ID mapping loaded:', productIdMap.size, 'entries');
         
     } catch (error) {
         console.error('Error loading product IDs:', error);
@@ -1286,8 +1269,6 @@ async function scanBarcodes() {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
 
-    scanning = true;
-
     async function tick() {
         if (!scanning) return;
 
@@ -1297,7 +1278,7 @@ async function scanBarcodes() {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
             try {
-                // 1. QR Code processing
+                // 1. QR Code 處理
                 const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
                 const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
                 if (qrResult) {
@@ -1312,7 +1293,7 @@ async function scanBarcodes() {
                     }
                 }
 
-                // 2. Data Matrix and 1D barcode processing
+                // 2. Data Matrix 和一維碼處理
                 const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
                 const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
                 const reader = new ZXing.MultiFormatReader();
@@ -1330,52 +1311,30 @@ async function scanBarcodes() {
                         const scannedText = result.text;
                         const format = result.getBarcodeFormat();
                         console.log('Barcode detected:', format, scannedText);
-    
-                        // Data Matrix handling
+
+                        // Data Matrix 處理
                         if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-                            console.log('Raw Data Matrix content:', scannedText);
-                            
-                            try {
-                                // 去除所有非數字字符
-                                const cleanedScannedText = scannedText.trim().replace(/\D/g, '');
-                                console.log('Cleaned scanned text (digits only):', cleanedScannedText);
-                                console.log('Length of cleaned scanned text:', cleanedScannedText.length);
-                                
-                                // 確認是否為 15 位數字
-                                if (cleanedScannedText.length !== 15) {
-                                    console.warn(`Scanned text length is ${cleanedScannedText.length} digits, expected 15 digits.`);
-                                    alert(`掃描的條碼內容長度為 ${cleanedScannedText.length} 位，預期為 15 位。`);
-                                    closeScanner();
-                                    return;
-                                }
-                                
-                                const productId = cleanedScannedText;
-                                console.log('Parsed 15-digit productId:', productId);
-                                
-                                if (productIdMap.has(productId)) {
-                                    const itemCode = productIdMap.get(productId);
-                                    console.log('Found matching item code:', itemCode);
+                            console.log('Processing Data Matrix:', scannedText);
+                            // 檢查是否含有01到10之間的數字
+                             const match = scannedText.match(/01(\d+?)(?=10|$)/);
+                               if (match && match[1]) {
+                                const extractedNumber = match[1];
+                                const itemCode = productIdMap.get(extractedNumber);
+                                if (itemCode) {
                                     handleItemCode(itemCode);
                                     return;
-                                } else {
-                                    console.log('No matching item code found for:', productId);
-                                    console.log('Available product IDs:', Array.from(productIdMap.keys()));
-                                    alert(`條碼內容：${productId} 未於系統登記`);
-                                    closeScanner();
-                                    return;
+                        
                                 }
-                            } catch (error) {
-                                console.error('Error processing Data Matrix:', error);
-                                alert('處理條碼時發生錯誤');
-                                closeScanner();
-                                return;
                             }
+                            
+                            // 如果找不到，顯示錯誤訊息
+                            alert(`無法識別的條碼格式或未找到對應的商品代碼`);
+                            closeScanner();
+                            return;
                         }
-                        // 1D barcode handling (EAN-13, CODE-128)
-                        else if (
-                            format === ZXing.BarcodeFormat.EAN_13 || 
-                            format === ZXing.BarcodeFormat.CODE_128
-                        ) {
+                        // 一維碼處理
+                        else if (format === ZXing.BarcodeFormat.EAN_13 || 
+                                format === ZXing.BarcodeFormat.CODE_128) {
                             const normalizedText = normalizeBarcode(scannedText);
                             const itemCode = productIdMap.get(normalizedText);
                             if (itemCode) {
@@ -1389,47 +1348,36 @@ async function scanBarcodes() {
                         }
                     }
                 } catch (readerError) {
+                    // 只有當錯誤不是 NotFoundException 時才處理
                     if (readerError.name !== 'NotFoundException') {
                         console.error('ZXing reader error:', readerError);
                     }
                 }
             } catch (error) {
                 console.error('General scanning error:', error);
-                console.log('Scanning state:', scanning);
-                console.log('Video state:', video.readyState);
             }
         }
-
-        if (scanning) {
-            requestAnimationFrame(tick);
-        }
+        requestAnimationFrame(tick);
     }
 
     tick();
 }
+
+
 function closeScanner() {
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
     
-    // Reset scanning state
-    scanning = false;
+    scanning = false;  // 確保設置為 false
+    modal.style.display = 'none';
     
-    // Stop video stream
     if (video.srcObject) {
         const tracks = video.srcObject.getTracks();
         tracks.forEach(track => {
-            track.stop();
+            track.stop();  // 停止所有視頻軌道
         });
-        video.srcObject = null;
+        video.srcObject = null;  // 清除視頻源
     }
-    
-    // Hide modal
-    modal.style.display = 'none';
-    
-    // Additional cleanup
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    context.clearRect(0, 0, canvas.width, canvas.height);
 }
 
 // 顯示 Loading
