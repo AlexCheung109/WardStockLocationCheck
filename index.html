@@ -1340,7 +1340,7 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
     
     try {
         // Take first 15 characters only
-        const first15Chars = scannedText.trim().substring(0, 15);
+        const first15Chars = scannedText.replace(/\s+/g, '').substring(0, 15);
         console.log('First 15 characters:', first15Chars);
         
         // Lookup in product ID mapping
