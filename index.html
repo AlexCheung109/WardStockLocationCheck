@@ -343,7 +343,6 @@ button:disabled {
 .scan-button:hover {
     background-color: #45a049;
 }
-
 .scanner-modal {
     display: none;
     position: fixed;
@@ -352,19 +351,23 @@ button:disabled {
     width: 100%;
     height: 100%;
     z-index: 1000;
+    overflow: auto; /* 添加滾動條以適應長內容 */
+    background-color: rgba(0, 0, 0, 0.7); /* 背景半透明 */
 }
 
 .scanner-content {
-    position: absolute;
+    position: relative;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background-color: rgba(0, 0, 0, 0.7);
+    background-color: white;
     padding: 20px;
     border-radius: 8px;
     width: 90%;
     max-width: 400px;
-    min-height: 500px; /* 確保有足夠空間 */
+    max-height: 90%; /* 限制內容高度 */
+    overflow-y: auto; /* 如果內容超長，啟用滾動條 */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 .scan-result-content {
     text-align: left;
@@ -568,10 +571,10 @@ button:disabled {
 <!-- Scanner Modal -->
 <div id="scannerModal" class="scanner-modal">
     <div class="scanner-content">
-        <div class="scanner-header">
-            <span>掃描條碼</span>
-            <button class="close-button" onclick="closeScanner()">&times;</button>
-        </div>
+        <!-- Close Button -->
+        <button class="close-button" onclick="closeScanner()">&times;</button>
+
+        <!-- Scanner Video -->
         <div id="scanner-container">
             <video id="scanner-video" playsinline></video>
             <!-- 遮罩層 -->
@@ -582,6 +585,7 @@ button:disabled {
             <!-- 掃描框 -->
             <div class="scanner-overlay"></div>
         </div>
+
         <!-- 掃描結果區域 -->
         <div class="scan-result-display" style="display: none;">
             <div class="scan-result-content"></div>
