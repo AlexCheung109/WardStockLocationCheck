@@ -1644,27 +1644,74 @@ function resetScanner() {
     }
 }
 
-// 新增一個輔助函數來顯示掃描結果
 function displayScanResult(message, isSuccess, autoReset = true) {
     const resultDisplay = document.querySelector('.scan-result-display');
+    const selectedWard = document.getElementById('wardSelect').value.toUpperCase();
+    
     if (resultDisplay) {
         resultDisplay.style.display = 'block';
-        if (typeof message === 'string') {
-            resultDisplay.innerHTML = `
+        
+        let displayContent = '';
+        
+        // 如果是 B6 或 D6 病房，且有成功找到結果
+        if ((selectedWard === 'B6' || selectedWard === 'D6') && isSuccess) {
+            // 從 message 中提取 itemCode（假設 message 是 HTML 字符串）
+            const itemCodeMatch = message.match(/物品編號:\s*(\d+)/);
+            const itemCode = itemCodeMatch ? itemCodeMatch[1] : null;
+            
+            if (itemCode) {
+                // 添加 QR Code
+                displayContent = `
+                    <div class="scan-result-content">
+                        <div style="text-align: center; margin-bottom: 15px;">
+                            <canvas id="scan-result-qr" style="width: 120px; height: 120px;"></canvas>
+                        </div>
+                        <div style="
+                            color: ${isSuccess ? '#4CAF50' : '#f44336'};
+                            font-size: ${isSuccess ? '1em' : '1.2em'};
+                            text-align: left;
+                            padding: 10px;
+                        ">
+                            ${message}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        // 如果沒有設置 displayContent（非 B6/D6 或無 itemCode），使用默認格式
+        if (!displayContent) {
+            displayContent = `
                 <div class="scan-result-content">
                     <div style="
                         color: ${isSuccess ? '#4CAF50' : '#f44336'};
                         font-size: ${isSuccess ? '1em' : '1.2em'};
-                        font-weight: ${isSuccess ? 'normal' : 'bold'};
-                        text-align: center;
+                        text-align: ${typeof message === 'string' ? 'center' : 'left'};
                         padding: 10px;
                     ">
                         ${message}
                     </div>
                 </div>
             `;
-        } else {
-            resultDisplay.innerHTML = message;
+        }
+        
+        resultDisplay.innerHTML = displayContent;
+        
+        // 如果需要生成 QR Code
+        if ((selectedWard === 'B6' || selectedWard === 'D6') && isSuccess) {
+            const itemCodeMatch = message.match(/物品編號:\s*(\d+)/);
+            const itemCode = itemCodeMatch ? itemCodeMatch[1] : null;
+            
+            if (itemCode) {
+                const qrCanvas = document.getElementById('scan-result-qr');
+                if (qrCanvas) {
+                    new QRious({
+                        element: qrCanvas,
+                        value: itemCode,
+                        size: 120
+                    });
+                }
+            }
         }
         
         // 閃爍效果
