@@ -1434,7 +1434,7 @@ async function scanBarcodes() {
                                         displayScanResult(`未找到對應商品代碼<br>掃描內容：${productId}`, false);
                                         setTimeout(() => {
                                             resetScanner();
-                                        }, 2000); // 2秒後重置掃描器
+                                        }, 2000);
                                     }
                                 } else {
                                     displayScanResult(`無法提取完整15位數字<br>當前內容：${cleanText}`, false);
@@ -1482,9 +1482,6 @@ async function scanBarcodes() {
 
     tick();
 }
-
-}
-
 function closeScanner() {
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
