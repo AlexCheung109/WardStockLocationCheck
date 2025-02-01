@@ -1694,13 +1694,30 @@ function displayScanResult(message, isSuccess, autoReset = true) {
 
         console.log('Extracted Item Code:', itemCode);
         
-        // 如果是 B6 或 D6 病房，且有成功找到結果
-        if ((selectedWard === 'B6' || selectedWard === 'D6') && isSuccess && itemCode) {
-            // 添加 QR Code
+        // 檢查位置信息（針對 B6/D6 的特殊處理）
+        let locationStartsWithE = false;
+        if (itemCode) {
+            const itemInfo = data.find(row => 
+                row.ward === selectedWard && 
+                row.itemCode.toString() === itemCode.toString()
+            );
+            if (itemInfo) {
+                locationStartsWithE = itemInfo.location.startsWith('***E') || 
+                                    itemInfo.location.startsWith('**E');
+            }
+        }
+
+        // 如果是 B6 或 D6 病房，且有成功找到結果，且位置符合條件
+        if ((selectedWard === 'B6' || selectedWard === 'D6') && 
+            isSuccess && itemCode && locationStartsWithE) {
+            
             displayContent = `
                 <div class="scan-result-content">
                     <div style="text-align: center; margin-bottom: 15px;">
                         <div id="scan-result-qr-container"></div>
+                        <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                            掃描此條碼可直接開啟藥物櫃
+                        </div>
                     </div>
                     <div style="
                         color: ${isSuccess ? '#4CAF50' : '#f44336'};
@@ -1740,7 +1757,7 @@ function displayScanResult(message, isSuccess, autoReset = true) {
                 }
             }
         } else {
-            // 非 B6/D6 或無 itemCode 的默認顯示
+            // 非特殊情況的默認顯示
             displayContent = `
                 <div class="scan-result-content">
                     <div style="
@@ -1756,17 +1773,18 @@ function displayScanResult(message, isSuccess, autoReset = true) {
             resultDisplay.innerHTML = displayContent;
         }
         
-        // 閃爍效果
+        // 顯示動畫效果
         resultDisplay.style.opacity = '0.5';
         setTimeout(() => {
             resultDisplay.style.opacity = '1';
         }, 100);
 
-        // 自動重置
+        // 自動重置掃描器
         if (autoReset) {
+            const resetDelay = isSuccess ? 2000 : 1500; // 成功時顯示更久
             setTimeout(() => {
                 resetScanner();
-            }, 2000);
+            }, resetDelay);
         }
     }
 }
