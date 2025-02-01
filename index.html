@@ -301,13 +301,13 @@ button:disabled {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background-color: rgba(0, 0, 0, 0.7); /* 整體背景半透明 */
+    background-color: rgba(0, 0, 0, 0.7);
     padding: 20px;
     border-radius: 8px;
     width: 90%;
     max-width: 400px;
+    min-height: 500px; /* 確保有足夠空間 */
 }
-
 .scan-result-content {
     text-align: left;
     width: 100%;
@@ -334,7 +334,11 @@ button:disabled {
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     position: relative;
-    z-index: 3; /* 確保結果顯示在最上層 */
+    z-index: 3;
+    min-height: 200px; /* 確保有足夠空間 */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 .scanner-header {
     background: transparent;
@@ -1712,9 +1716,9 @@ function displayScanResult(message, isSuccess, autoReset = true) {
             isSuccess && itemCode && locationStartsWithE) {
             
             displayContent = `
-                <div class="scan-result-content">
-                    <div style="text-align: center; margin-bottom: 15px;">
-                        <div id="scan-result-qr-container"></div>
+                <div class="scan-result-content" style="width: 100%; max-width: 300px; margin: 0 auto;">
+                    <div style="text-align: center; margin-bottom: 15px; min-height: 150px;">
+                        <canvas id="scan-result-qr" width="150" height="150" style="margin: 0 auto;"></canvas>
                         <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
                             掃描此條碼可直接開啟藥物櫃
                         </div>
@@ -1732,25 +1736,16 @@ function displayScanResult(message, isSuccess, autoReset = true) {
 
             resultDisplay.innerHTML = displayContent;
 
-            // 在內容設置後立即生成 QR Code
-            const qrContainer = document.getElementById('scan-result-qr-container');
-            if (qrContainer) {
-                // 創建新的 canvas 元素
-                const qrCanvas = document.createElement('canvas');
-                qrCanvas.id = 'scan-result-qr';
-                qrCanvas.style.width = '120px';
-                qrCanvas.style.height = '120px';
-                qrContainer.appendChild(qrCanvas);
-
+            // 直接在 canvas 上生成 QR Code
+            const qrCanvas = document.getElementById('scan-result-qr');
+            if (qrCanvas) {
                 console.log('Creating QR Code for:', itemCode);
-                
-                // 使用 QRious 生成 QR Code
                 try {
                     new QRious({
                         element: qrCanvas,
                         value: itemCode,
-                        size: 120,
-                        level: 'H' // 高糾錯級別
+                        size: 150,  // 增加尺寸
+                        level: 'H'
                     });
                 } catch (error) {
                     console.error('QR Code generation error:', error);
@@ -1772,6 +1767,15 @@ function displayScanResult(message, isSuccess, autoReset = true) {
             `;
             resultDisplay.innerHTML = displayContent;
         }
+
+        // 添加調試訊息
+        console.log('QR Code generation parameters:', {
+            selectedWard,
+            isSuccess,
+            itemCode,
+            locationStartsWithE,
+            canvasExists: !!document.getElementById('scan-result-qr')
+        });
         
         // 顯示動畫效果
         resultDisplay.style.opacity = '0.5';
