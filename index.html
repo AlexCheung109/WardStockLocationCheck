@@ -34,6 +34,7 @@
     background-color: #fff;
     padding: 20px;
     display: flex;
+    flex-direction: column; /* 垂直排列，確保提示文字在上方 */
     align-items: center;
     justify-content: center;
     width: 100%;
@@ -52,7 +53,7 @@
     font-size: 14px;
     color: #333;
     text-align: center;
-    margin-top: 10px;
+    margin-bottom: 10px; /* 與二維碼之間的間距 */
 }
 
 .text-result-section {
@@ -1718,13 +1719,13 @@ function displayScanResultWithQrCode(message, itemCode, isSuccess, autoReset = t
     if (resultDisplay) {
         resultDisplay.style.display = 'block';
 
-        // 構建顯示內容，包括提示文字
+        // 構建顯示內容，將提示文字移到二維碼上方
         const displayContent = `
             <div class="result-container">
                 <!-- QR Code 區域 -->
                 <div class="qr-code-section">
-                    <canvas id="scan-result-qr" width="150" height="150"></canvas>
                     <p class="qr-reminder">請掃瞄此二維碼打開所屬藥格</p>
+                    <canvas id="scan-result-qr" width="150" height="150"></canvas>
                 </div>
                 <!-- 文字結果區域 -->
                 <div class="text-result-section">
