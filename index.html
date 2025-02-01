@@ -65,14 +65,45 @@ button:disabled {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 60%; /* Reduced from 80% */
-    height: 40%; /* Reduced from 60% */
+    width: 60%;
+    height: 40%;
     border: 2px solid #4CAF50;
     border-radius: 10px;
-    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+    z-index: 2;
 }
 
+.overlay-mask {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.5);
+}
 
+.overlay-top {
+    top: 0;
+    left: 0;
+    right: 0;
+    height: calc(50% - 60px); /* 調整高度以配合掃描框 */
+}
+
+.overlay-bottom {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: calc(50% - 60px);
+}
+
+.overlay-left {
+    top: calc(50% - 60px);
+    left: 0;
+    width: calc(50% - 120px);
+    height: 120px;
+}
+
+.overlay-right {
+    top: calc(50% - 60px);
+    right: 0;
+    width: calc(50% - 120px);
+    height: 120px;
+}
 
 
 
@@ -262,7 +293,6 @@ button:disabled {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.7);
     z-index: 1000;
 }
 
@@ -271,27 +301,45 @@ button:disabled {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background-color: #f5f5f5;
+    background-color: rgba(0, 0, 0, 0.7); /* 整體背景半透明 */
     padding: 20px;
     border-radius: 8px;
     width: 90%;
     max-width: 400px;
 }
 
+.scan-result-content {
+    text-align: left;
+    width: 100%;
+}
+
+.scan-result-content div {
+    margin-bottom: 8px;
+}
+
+.scan-result-location {
+    font-weight: bold;
+    color: #4CAF50;
+}
+
+.scan-result-description {
+    font-size: 0.9em;
+    color: #666;
+}
+
 .scan-result-display {
     background-color: white;
-    padding: 10px;
-    margin-top: 10px;
-    border-radius: 4px;
-    text-align: center;
-    min-height: 50px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    word-break: break-all;
+    padding: 15px;
+    margin-top: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: relative;
+    z-index: 3; /* 確保結果顯示在最上層 */
 }
 .scanner-header {
+    background: transparent;
+    color: white;
+    padding: 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -314,6 +362,7 @@ button:disabled {
     align-items: center;
     justify-content: center;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 3;
 }
 
 .close-button:hover {
@@ -325,6 +374,7 @@ button:disabled {
     width: 100%;
     height: 300px;
     margin-bottom: 10px;
+    overflow: hidden;
 }
 
 #scanner-video {
@@ -457,14 +507,23 @@ button:disabled {
 <div id="scannerModal" class="scanner-modal">
     <div class="scanner-content">
         <div class="scanner-header">
-            <span>Scan Barcode</span>
+            <span>掃描條碼</span>
             <button class="close-button" onclick="closeScanner()">&times;</button>
         </div>
         <div id="scanner-container">
             <video id="scanner-video" playsinline></video>
+            <!-- 遮罩層 -->
+            <div class="overlay-mask overlay-top"></div>
+            <div class="overlay-mask overlay-bottom"></div>
+            <div class="overlay-mask overlay-left"></div>
+            <div class="overlay-mask overlay-right"></div>
+            <!-- 掃描框 -->
             <div class="scanner-overlay"></div>
         </div>
-        <!-- 掃描結果會自動插入到這裡 -->
+        <!-- 掃描結果區域 -->
+        <div class="scan-result-display" style="display: none;">
+            <div class="scan-result-content"></div>
+        </div>
     </div>
 </div>
         <!-- Removed the Item Code Select and Search Button -->
@@ -1325,91 +1384,88 @@ async function scanBarcodes() {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
             try {
-                // 1. QR Code processing
+                // QR Code processing
                 const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
                 const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
                 if (qrResult) {
-                    console.log('QR Code detected:', qrResult.data);
                     const qrContent = qrResult.data;
                     if (qrContent.includes('<F>') && qrContent.includes('</F>')) {
                         const fMatch = qrContent.match(/<F>(.*?)<\/F>/);
                         if (fMatch && fMatch[1]) {
+                            scanning = false; // 暫停掃描
                             handleItemCode(fMatch[1]);
-                            return;
                         }
                     }
                 }
 
-                // 2. Data Matrix and 1D barcode processing
-                const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-                const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
-                const reader = new ZXing.MultiFormatReader();
-                
-                const hints = new Map();
-                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-                    ZXing.BarcodeFormat.DATA_MATRIX,
-                    ZXing.BarcodeFormat.EAN_13,
-                    ZXing.BarcodeFormat.CODE_128
-                ]);
-                
-                try {
-                    const result = reader.decode(binaryBitmap, hints);
-                    if (result) {
-                        const scannedText = result.text;
-                        const format = result.getBarcodeFormat();
-                        console.log('Barcode detected:', format, scannedText);
+                // Data Matrix and 1D barcode processing
+                if (scanning) { // 只在還在掃描時處理
+                    const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+                    const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
+                    const reader = new ZXing.MultiFormatReader();
+                    
+                    const hints = new Map();
+                    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+                        ZXing.BarcodeFormat.DATA_MATRIX,
+                        ZXing.BarcodeFormat.EAN_13,
+                        ZXing.BarcodeFormat.CODE_128
+                    ]);
+                    
+                    try {
+                        const result = reader.decode(binaryBitmap, hints);
+                        if (result) {
+                            const scannedText = result.text;
+                            const format = result.getBarcodeFormat();
+                            console.log('Barcode detected:', format, scannedText);
 
-console.log('Raw scanned text:', scannedText);
-console.log('Checking for GTIN format...');
+                            scanning = false; // 暫停掃描
 
-// Data Matrix handling
-if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-    try {
-        let cleanText = scannedText.replace(/[^0-9]/g, '');
-        let match = cleanText.match(/^01\d{13}/);
-        
-        if (match) {
-            let productId = match[0];
-            const itemCode = productIdMap.get(productId);
-            
-            if (itemCode) {
-                handleItemCode(itemCode);
-            } else {
-                displayScanResult(`未找到對應商品代碼\n掃描內容：${productId}`, false);
-            }
-        } else {
-            displayScanResult(`無法提取完整15位數字\n當前內容：${cleanText}`, false);
-        }
-    } catch (error) {
-        console.error('處理錯誤:', error);
-        displayScanResult('處理條碼時發生錯誤', false);
-    }
-    // 移除 closeScanner()
-}
-// 1D barcode handling (EAN-13, CODE-128)
-                        else if (format === ZXing.BarcodeFormat.EAN_13 || 
-                                format === ZXing.BarcodeFormat.CODE_128) {
-                            const normalizedText = normalizeBarcode(scannedText);
-                            const itemCode = productIdMap.get(normalizedText);
-                            if (itemCode) {
-                                handleItemCode(itemCode);
-                                return;
-                            } else {
-                                alert(`條碼 ${normalizedText} 未在系統中登記`);
-                                closeScanner();
-                                return;
+                            // Data Matrix handling
+                            if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
+                                try {
+                                    let cleanText = scannedText.replace(/[^0-9]/g, '');
+                                    let match = cleanText.match(/^01\d{13}/);
+                                    
+                                    if (match) {
+                                        let productId = match[0];
+                                        const itemCode = productIdMap.get(productId);
+                                        
+                                        if (itemCode) {
+                                            handleItemCode(itemCode);
+                                        } else {
+                                            displayScanResult(`未找到對應商品代碼\n掃描內容：${productId}`, false);
+                                            resetScanner();
+                                        }
+                                    } else {
+                                        displayScanResult(`無法提取完整15位數字\n當前內容：${cleanText}`, false);
+                                        resetScanner();
+                                    }
+                                } catch (error) {
+                                    console.error('處理錯誤:', error);
+                                    resetScanner();
+                                }
+                            }
+                            // 1D barcode handling
+                            else if (format === ZXing.BarcodeFormat.EAN_13 || 
+                                    format === ZXing.BarcodeFormat.CODE_128) {
+                                const normalizedText = normalizeBarcode(scannedText);
+                                const itemCode = productIdMap.get(normalizedText);
+                                if (itemCode) {
+                                    handleItemCode(itemCode);
+                                } else {
+                                    displayScanResult(`條碼 ${normalizedText} 未在系統中登記`, false);
+                                    resetScanner();
+                                }
                             }
                         }
-                    }
-                } catch (readerError) {
-                    if (readerError.name !== 'NotFoundException') {
-                        console.error('ZXing reader error:', readerError);
+                    } catch (readerError) {
+                        if (readerError.name !== 'NotFoundException') {
+                            console.error('ZXing reader error:', readerError);
+                        }
                     }
                 }
             } catch (error) {
                 console.error('General scanning error:', error);
-    console.log('Scanning state:', scanning);
-    console.log('Video state:', video.readyState);
             }
         }
 
@@ -1419,8 +1475,7 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
     }
 
     tick();
-}
-function closeScanner() {
+}function closeScanner() {
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
     
@@ -1517,9 +1572,12 @@ async function handleDataMatrix(scannedText) {
     }
 }
 
+javascript
+
+複製
 function handleItemCode(itemCode) {
     if (!itemCode) {
-        return; // 靜默失敗，繼續掃描
+        return;
     }
 
     const selectedWard = document.getElementById('wardSelect').value;
@@ -1553,9 +1611,31 @@ function handleItemCode(itemCode) {
         // 自動過濾並顯示結果
         document.getElementById('itemCodeFilter').value = itemCode;
         filterItemCodes();
+
+        // 重要：重置掃描器狀態，準備下一次掃描
+        setTimeout(() => {
+            resetScanner();
+        }, 1000); // 延遲1秒後重置
     } else {
         // 未找到物品
         displayScanResult(`此物品 (${itemCode}) 並非 ${selectedWard} 的 ward stock item`, false);
+        // 錯誤情況也需要重置
+        setTimeout(() => {
+            resetScanner();
+        }, 1000);
+    }
+}
+
+// 新增重置掃描器函數
+function resetScanner() {
+    const video = document.getElementById('scanner-video');
+    const canvas = document.createElement('canvas');
+    
+    if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        scanning = true; // 重新啟用掃描
+        scanBarcodes(); // 重新開始掃描
     }
 }
 
@@ -1563,8 +1643,20 @@ function handleItemCode(itemCode) {
 function displayScanResult(message, isSuccess) {
     const resultDisplay = document.querySelector('.scan-result-display');
     if (resultDisplay) {
-        resultDisplay.innerHTML = message;
-        resultDisplay.style.color = isSuccess ? '#4CAF50' : '#f44336';
+        resultDisplay.style.display = 'block';
+        if (typeof message === 'string') {
+            // 如果是簡單的文字消息
+            resultDisplay.innerHTML = `
+                <div class="scan-result-content">
+                    <div style="color: ${isSuccess ? '#4CAF50' : '#f44336'}">
+                        ${message}
+                    </div>
+                </div>
+            `;
+        } else {
+            // 如果是 HTML 內容
+            resultDisplay.innerHTML = message;
+        }
         
         // 閃爍效果
         resultDisplay.style.opacity = '0.5';
