@@ -933,8 +933,9 @@ function updateWardSelect() {
         select.appendChild(option);
     });
 
-    // 添加 onchange 事件監聽器
     select.onchange = handleWardSelection;
+}
+
 
 // 添加新的函數來處理 ward 選擇
 function handleWardSelection() {
@@ -943,21 +944,18 @@ function handleWardSelection() {
     const scanButton = document.getElementById('scanButton');
     
     if (selectedWard) {
-        // 啟用 item code filter 和 scan button
         itemCodeFilter.disabled = false;
         scanButton.disabled = false;
         itemCodeFilter.placeholder = "Enter Item Code";
-        displayItemCodes(); // 顯示該病房的 item codes
+        displayItemCodes();
     } else {
-        // 禁用 item code filter 和 scan button
         itemCodeFilter.disabled = true;
         scanButton.disabled = true;
         itemCodeFilter.placeholder = "Please select a ward first";
-        itemCodeFilter.value = ''; // 清空輸入
-        document.getElementById('result').innerHTML = ''; // 清空結果
+        itemCodeFilter.value = '';
+        document.getElementById('result').innerHTML = '';
     }
 }
-    }
 
     // Helper function to parse ward into letters, number, and suffix
     function parseWard(ward) {
@@ -1484,7 +1482,10 @@ async function scanBarcodes() {
 
     tick();
 }
-}function closeScanner() {
+
+}
+
+function closeScanner() {
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
     
@@ -1581,9 +1582,7 @@ async function handleDataMatrix(scannedText) {
     }
 }
 
-javascript
 
-複製
 function handleItemCode(itemCode) {
     if (!itemCode) {
         return;
@@ -1649,7 +1648,7 @@ function resetScanner() {
 }
 
 // 新增一個輔助函數來顯示掃描結果
-function displayScanResult(message, isSuccess) {
+function displayScanResult(message, isSuccess, autoReset = true) {
     const resultDisplay = document.querySelector('.scan-result-display');
     if (resultDisplay) {
         resultDisplay.style.display = 'block';
@@ -1676,6 +1675,13 @@ function displayScanResult(message, isSuccess) {
         setTimeout(() => {
             resultDisplay.style.opacity = '1';
         }, 100);
+
+        // 自動重置
+        if (autoReset) {
+            setTimeout(() => {
+                resetScanner();
+            }, 2000);
+        }
     }
 }
 </script>
