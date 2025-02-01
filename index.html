@@ -48,20 +48,29 @@
     animation: spin 1s linear infinite;
 }
 
+.qr-reminder {
+    font-size: 14px;
+    color: #333;
+    text-align: center;
+    margin-top: 10px;
+}
+
 .text-result-section {
-    padding: 20px;
-    text-align: left;
     width: 100%;
-    max-height: 200px; /* 限制高度，支持滾動 */
-    overflow-y: auto;
+    word-wrap: break-word;
 }
 
 .text-result-section p {
-    margin: 10px 0;
     font-size: 14px;
-    color: #333;
+    margin: 10px 0;
 }
 
+.text-result-section.error {
+    color: #f44336; /* 紅色 */
+    font-weight: bold; /* 粗體 */
+    text-align: center; /* 置中 */
+    font-size: 16px;
+}
 .text-result-section .highlight {
     font-weight: bold;
     color: #4CAF50;
@@ -1703,19 +1712,19 @@ function resetScanner() {
         scanBarcodes(); // 重新開始掃描
     }
 }
-
 function displayScanResultWithQrCode(message, itemCode, isSuccess, autoReset = true) {
     const resultDisplay = document.querySelector('.scan-result-display');
 
     if (resultDisplay) {
         resultDisplay.style.display = 'block';
 
-        // 構建顯示內容
+        // 構建顯示內容，包括提示文字
         const displayContent = `
             <div class="result-container">
                 <!-- QR Code 區域 -->
                 <div class="qr-code-section">
                     <canvas id="scan-result-qr" width="150" height="150"></canvas>
+                    <p class="qr-reminder">請掃瞄此二維碼打開所屬藥格</p>
                 </div>
                 <!-- 文字結果區域 -->
                 <div class="text-result-section">
@@ -1756,9 +1765,16 @@ function displayScanResult(message, isSuccess, autoReset = true) {
     if (resultDisplay) {
         resultDisplay.style.display = 'block';
 
+        // 根據是否成功切換樣式
+        const messageStyle = `
+            color: ${isSuccess ? '#4CAF50' : '#f44336'}; 
+            font-weight: ${isSuccess ? 'normal' : 'bold'}; 
+            text-align: ${isSuccess ? 'left' : 'center'};
+        `;
+
         // 構建顯示內容
         const displayContent = `
-            <div class="text-result-section">
+            <div class="text-result-section" style="${messageStyle}">
                 ${message}
             </div>
         `;
