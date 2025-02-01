@@ -1685,14 +1685,14 @@ function displayScanResult(message, isSuccess, autoReset = true) {
         
         // 改進 itemCode 提取邏輯
         if (typeof message === 'string') {
-            const itemCodeMatch = message.match(/物品編號:\s*(\d+)/);
+            const itemCodeMatch = message.match(/物品編號:\s*(\w+)/);  // 修改這裡以匹配字母和數字
             itemCode = itemCodeMatch ? itemCodeMatch[1] : null;
         } else {
             // 如果 message 是 HTML 字符串
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = message;
             const itemCodeText = tempDiv.textContent;
-            const itemCodeMatch = itemCodeText.match(/物品編號:\s*(\d+)/);
+            const itemCodeMatch = itemCodeText.match(/物品編號:\s*(\w+)/);  // 這裡也要修改
             itemCode = itemCodeMatch ? itemCodeMatch[1] : null;
         }
 
@@ -1706,10 +1706,18 @@ function displayScanResult(message, isSuccess, autoReset = true) {
                 row.itemCode.toString() === itemCode.toString()
             );
             if (itemInfo) {
-                locationStartsWithE = itemInfo.location.startsWith('***E') || 
-                                    itemInfo.location.startsWith('**E');
+                locationStartsWithE = itemInfo.location.startsWith('**E');  // 修改這裡以匹配 **E
+                console.log('Location:', itemInfo.location, 'Starts with E:', locationStartsWithE);
             }
         }
+
+        // 檢查條件並輸出調試信息
+        console.log('Conditions check:', {
+            isB6orD6: (selectedWard === 'B6' || selectedWard === 'D6'),
+            isSuccess,
+            hasItemCode: !!itemCode,
+            locationStartsWithE
+        });
 
         // 如果是 B6 或 D6 病房，且有成功找到結果，且位置符合條件
         if ((selectedWard === 'B6' || selectedWard === 'D6') && 
@@ -1744,7 +1752,7 @@ function displayScanResult(message, isSuccess, autoReset = true) {
                     new QRious({
                         element: qrCanvas,
                         value: itemCode,
-                        size: 150,  // 增加尺寸
+                        size: 150,
                         level: 'H'
                     });
                 } catch (error) {
@@ -1767,15 +1775,6 @@ function displayScanResult(message, isSuccess, autoReset = true) {
             `;
             resultDisplay.innerHTML = displayContent;
         }
-
-        // 添加調試訊息
-        console.log('QR Code generation parameters:', {
-            selectedWard,
-            isSuccess,
-            itemCode,
-            locationStartsWithE,
-            canvasExists: !!document.getElementById('scan-result-qr')
-        });
         
         // 顯示動畫效果
         resultDisplay.style.opacity = '0.5';
@@ -1785,7 +1784,7 @@ function displayScanResult(message, isSuccess, autoReset = true) {
 
         // 自動重置掃描器
         if (autoReset) {
-            const resetDelay = isSuccess ? 2000 : 1500; // 成功時顯示更久
+            const resetDelay = isSuccess ? 2000 : 1500;
             setTimeout(() => {
                 resetScanner();
             }, resetDelay);
