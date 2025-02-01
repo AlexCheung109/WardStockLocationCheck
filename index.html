@@ -1375,18 +1375,18 @@ if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
             if (itemCode) {
                 handleItemCode(itemCode);
             } else {
-                alert(`未找到對應商品代碼\n掃描內容：${productId}`);
+                displayScanResult(`未找到對應商品代碼\n掃描內容：${productId}`, false);
             }
         } else {
-            alert(`無法提取完整15位數字\n當前內容：${cleanText}`);
+            displayScanResult(`無法提取完整15位數字\n當前內容：${cleanText}`, false);
         }
     } catch (error) {
         console.error('處理錯誤:', error);
-    } finally {
-        closeScanner();
+        displayScanResult('處理條碼時發生錯誤', false);
     }
+    // 移除 closeScanner()
 }
-          // 1D barcode handling (EAN-13, CODE-128)
+// 1D barcode handling (EAN-13, CODE-128)
                         else if (format === ZXing.BarcodeFormat.EAN_13 || 
                                 format === ZXing.BarcodeFormat.CODE_128) {
                             const normalizedText = normalizeBarcode(scannedText);
@@ -1513,11 +1513,10 @@ async function handleDataMatrix(scannedText) {
     } catch (error) {
         console.error('DataMatrix 分析錯誤:', error);
         alert('分析條碼時發生錯誤');
-    } finally {
-        hideLoading();
-        closeScanner();
+
     }
 }
+
 function handleItemCode(itemCode) {
     if (!itemCode) {
         return; // 靜默失敗，繼續掃描
@@ -1525,44 +1524,55 @@ function handleItemCode(itemCode) {
 
     const selectedWard = document.getElementById('wardSelect').value;
     if (!selectedWard) {
-        alert('請先選擇病房');
-        closeScanner();
+        displayScanResult('請先選擇病房', false);
         return;
     }
 
     console.log('處理商品代碼:', itemCode);
     
-    // 檢查該物品是否屬於所選病房的 Ward Stock
-    const isWardStock = data.some(row => 
+    // 查找物品位置信息
+    const itemInfo = data.find(row => 
         row.ward === selectedWard && 
         row.itemCode.toString() === itemCode.toString()
     );
 
-    // 更新掃描器內的結果顯示
+    if (itemInfo) {
+        // 找到物品，顯示位置信息
+        const resultHTML = `
+            <div style="text-align: left; width: 100%;">
+                <div style="margin-bottom: 5px;">物品編號: ${itemCode}</div>
+                <div style="margin-bottom: 5px;">病房: ${itemInfo.ward}</div>
+                <div style="font-weight: bold; color: #4CAF50;">位置: ${itemInfo.location}</div>
+                <div style="font-size: 0.9em; color: #666;">
+                    ${itemDescriptions.get(itemCode) || '無描述'}
+                </div>
+            </div>
+        `;
+        displayScanResult(resultHTML, true);
+        
+        // 自動過濾並顯示結果
+        document.getElementById('itemCodeFilter').value = itemCode;
+        filterItemCodes();
+    } else {
+        // 未找到物品
+        displayScanResult(`此物品 (${itemCode}) 並非 ${selectedWard} 的 ward stock item`, false);
+    }
+}
+
+// 新增一個輔助函數來顯示掃描結果
+function displayScanResult(message, isSuccess) {
     const resultDisplay = document.querySelector('.scan-result-display');
     if (resultDisplay) {
-        if (isWardStock) {
-            resultDisplay.style.color = '#4CAF50'; // 綠色
-            resultDisplay.textContent = `掃描到物品: ${itemCode}`;
-            
-            // 自動過濾並顯示結果
-            document.getElementById('itemCodeFilter').value = itemCode;
-            filterItemCodes();
-        } else {
-            resultDisplay.style.color = '#f44336'; // 紅色
-            resultDisplay.textContent = `此物品 (${itemCode}) 並非 ${selectedWard} 的 ward stock item`;
-        }
-
+        resultDisplay.innerHTML = message;
+        resultDisplay.style.color = isSuccess ? '#4CAF50' : '#f44336';
+        
         // 閃爍效果
         resultDisplay.style.opacity = '0.5';
         setTimeout(() => {
             resultDisplay.style.opacity = '1';
         }, 100);
     }
-
-    // 不關閉掃描器，繼續掃描
 }
-
 
 </script>
 </body>
