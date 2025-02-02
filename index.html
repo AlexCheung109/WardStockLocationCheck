@@ -1705,22 +1705,21 @@ async function scanBarcodes() {
                 let imageData = context.getImageData(0, 0, canvas.width, canvas.height);
                 imageData = await processFrame(context, imageData);
 
-                // QR碼處理
+                // 嘗試QR碼識別
                 const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
                 if (qrResult) {
-                    console.log('檢測到QR碼:', qrResult.data);
                     const qrContent = qrResult.data;
                     if (qrContent.includes('<F>') && qrContent.includes('</F>')) {
                         const fMatch = qrContent.match(/<F>(.*?)<\/F>/);
                         if (fMatch && fMatch[1]) {
                             scanning = false;
-                            handleItemCode(fMatch[1]);
+                            await handleItemCode(fMatch[1]);
                             return;
                         }
                     }
                 }
 
-                // DataMatrix和其他條碼處理
+                // 嘗試其他條碼識別
                 const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
                 const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
                 const reader = new ZXing.MultiFormatReader();
@@ -1751,14 +1750,14 @@ async function scanBarcodes() {
                                 const itemCode = productIdMap.get(productId);
                                 
                                 if (itemCode) {
-                                    handleItemCode(itemCode);
+                                    await handleItemCode(itemCode);
                                 } else {
                                     displayScanResult(`未找到對應商品代碼<br>掃描內容：${productId}`, false);
-                                    setTimeout(() => { resetScanner(); }, 2000);
+                                    setTimeout(() => resetScanner(), 2000);
                                 }
                             } else {
                                 displayScanResult(`無法提取完整數字<br>當前內容：${cleanText}`, false);
-                                setTimeout(() => { resetScanner(); }, 2000);
+                                setTimeout(() => resetScanner(), 2000);
                             }
                         }
                         // EAN-13或CODE-128處理
@@ -1767,10 +1766,10 @@ async function scanBarcodes() {
                             const normalizedText = normalizeBarcode(scannedText);
                             const itemCode = productIdMap.get(normalizedText);
                             if (itemCode) {
-                                handleItemCode(itemCode);
+                                await handleItemCode(itemCode);
                             } else {
                                 displayScanResult(`條碼未在系統中登記<br>掃描內容：${normalizedText}`, false);
-                                setTimeout(() => { resetScanner(); }, 2000);
+                                setTimeout(() => resetScanner(), 2000);
                             }
                         }
                         return;
@@ -1782,6 +1781,8 @@ async function scanBarcodes() {
                 }
             } catch (error) {
                 console.error('掃描錯誤:', error);
+                displayScanResult('掃描過程中發生錯誤', false);
+                setTimeout(() => resetScanner(), 2000);
             }
         }
 
