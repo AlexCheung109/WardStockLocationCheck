@@ -684,6 +684,7 @@ const commonSettings = {
         { whiteBalanceMode: "continuous" }
     ]
 };
+
 const CAMERA_SETTINGS = {
     highRes: {
         width: { ideal: 1920 },
@@ -701,6 +702,7 @@ const CAMERA_SETTINGS = {
         ...commonSettings
     }
 };
+
 
 
 
@@ -1439,8 +1441,13 @@ let scanning = false;
    
 
     // 嘗試不同相機設置的函數
- async function tryCamera(settings) {
+async function tryCamera(settings) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('瀏覽器不支援相機訪問');
+    }
+
     const video = document.getElementById('scanner-video');
+    
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
             video: {
@@ -1453,27 +1460,30 @@ let scanning = false;
         video.srcObject = stream;
         video.setAttribute('playsinline', true);
         
-        // 設置定期刷新自動對焦
-        let focusInterval = setInterval(() => {
+        // 設置自動對焦
+        const focusInterval = setInterval(() => {
             const track = stream.getVideoTracks()[0];
             if (track && track.getCapabilities().focusMode) {
                 track.applyConstraints({
                     advanced: [{ focusMode: "continuous" }]
                 }).catch(err => console.log('對焦刷新失敗:', err));
             }
-        }, 3000); // 每3秒刷新一次對焦
+        }, 3000);
 
-        video.addEventListener('play', () => {
-            scanning = true;
-            scanBarcodes();
+        // 等待video準備完成
+        await new Promise((resolve) => {
+            video.addEventListener('loadedmetadata', () => {
+                video.play().then(resolve);
+            });
         });
 
-        video.play();
         video.dataset.focusInterval = focusInterval;
+        scanning = true;
+        await scanBarcodes();
+        
         return true;
-
     } catch (error) {
-        console.error("相機設置錯誤:", settings, error);
+        console.error('相機設置失敗:', error);
         return false;
     }
 }
@@ -1481,6 +1491,10 @@ let scanning = false;
    async function initCamera() {
     try {
         console.log('開始相機初始化...');
+        
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('瀏覽器不支援相機訪問');
+        }
         
         if (await tryCamera(CAMERA_SETTINGS.highRes)) {
             console.log('成功使用高解析度設置');
@@ -1499,10 +1513,11 @@ let scanning = false;
             return;
         }
         
-        alert("無法初始化相機，請檢查設備和權限設置");
+        throw new Error('無法初始化相機，請檢查設備和權限設置');
     } catch (error) {
         console.error('相機初始化錯誤:', error);
         alert("相機初始化失敗：" + error.message);
+        closeScanner();
     }
 }
 
@@ -1514,34 +1529,19 @@ async function startScanner() {
     }
 
     const modal = document.getElementById('scannerModal');
-    const video = document.getElementById('scanner-video');
-    
-    // 設置掃描結果顯示區域
-    const scannerContent = document.querySelector('.scanner-content');
-    let resultDisplay = scannerContent.querySelector('.scan-result-display');
-    if (!resultDisplay) {
-        resultDisplay = document.createElement('div');
-        resultDisplay.className = 'scan-result-display';
-        resultDisplay.style.cssText = `
-            background-color: white;
-            padding: 10px;
-            margin-top: 10px;
-            border-radius: 4px;
-            text-align: center;
-            min-height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        `;
-        scannerContent.appendChild(resultDisplay);
-    }
-
     modal.style.display = 'block';
-    await initCamera();
+    
+    try {
+        await initCamera();
+    } catch (error) {
+        console.error('啟動掃描器失敗:', error);
+        alert('無法啟動掃描器，請檢查相機權限設置');
+        closeScanner();
+    }
 }
 
     // 圖像預處理函數
-async function processFrame(context, imageData) {
+async function processImageData(context, imageData) {
     const data = imageData.data;
     const contrast = 1.5; // 增加對比度
     const brightness = 30; // 增加亮度
@@ -1571,123 +1571,7 @@ async function processFrame(context, imageData) {
     return imageData;
 }
 
-    async function tick() {
-if (!scanning) return;
-
-    const video = document.getElementById('scanner-video');
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        canvas.height = video.videoHeight;
-        canvas.width = video.videoWidth;
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        try {
-                // 圖像預處理
-                let imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                imageData = await processFrame(context, imageData);
-
-                // QR碼處理
-                const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
-                if (qrResult) {
-                    console.log('檢測到QR碼:', qrResult.data);
-                    const qrContent = qrResult.data;
-                    if (qrContent.includes('<F>') && qrContent.includes('</F>')) {
-                        const fMatch = qrContent.match(/<F>(.*?)<\/F>/);
-                        if (fMatch && fMatch[1]) {
-                            scanning = false;
-                            handleItemCode(fMatch[1]);
-                        }
-                    }
-                }
-
-                // DataMatrix和其他條碼處理
-                const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
-                const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
-                const reader = new ZXing.MultiFormatReader();
-                
-                const hints = new Map();
-                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-                    ZXing.BarcodeFormat.DATA_MATRIX,
-                    ZXing.BarcodeFormat.EAN_13,
-                    ZXing.BarcodeFormat.CODE_128
-                ]);
-                
-                try {
-                    const result = reader.decode(binaryBitmap, hints);
-                    if (result) {
-                        const scannedText = result.text;
-                        const format = result.getBarcodeFormat();
-                        console.log('檢測到條碼:', format, scannedText);
-
-                        scanning = false;
-
-                        // DataMatrix處理
-                        if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-                            try {
-                                let cleanText = scannedText.replace(/[^0-9]/g, '');
-                                let match = cleanText.match(/^01\d{13}/);
-                                
-                                if (match) {
-                                    let productId = match[0];
-                                    const itemCode = productIdMap.get(productId);
-                                    
-                                    if (itemCode) {
-                                        handleItemCode(itemCode);
-                                    } else {
-                                        displayScanResult(`未找到對應商品代碼<br>掃描內容：${productId}`, false);
-                                        setTimeout(() => {
-                                            resetScanner();
-                                        }, 2000);
-                                    }
-                                } else {
-                                    displayScanResult(`無法提取完整數字<br>當前內容：${cleanText}`, false);
-                                    setTimeout(() => {
-                                        resetScanner();
-                                    }, 2000);
-                                }
-                            } catch (error) {
-                                console.error('處理錯誤:', error);
-                                displayScanResult('處理條碼時發生錯誤', false);
-                                setTimeout(() => {
-                                    resetScanner();
-                                }, 2000);
-                            }
-                        }
-                        // EAN-13或CODE-128處理
-                        else if (format === ZXing.BarcodeFormat.EAN_13 || 
-                                format === ZXing.BarcodeFormat.CODE_128) {
-                            const normalizedText = normalizeBarcode(scannedText);
-                            const itemCode = productIdMap.get(normalizedText);
-                            if (itemCode) {
-                                handleItemCode(itemCode);
-                            } else {
-                                displayScanResult(`條碼未在系統中登記<br>掃描內容：${normalizedText}`, false);
-                                setTimeout(() => {
-                                    resetScanner();
-                                }, 2000);
-                            }
-                        }
-                    }
-                } catch (readerError) {
-                    if (readerError.name !== 'NotFoundException') {
-                        console.error('ZXing讀取錯誤:', readerError);
-                    }
-                }
-            } catch (error) {
-                console.error('掃描錯誤:', error);
-            }
-        }
-
-        if (scanning) {
-            requestAnimationFrame(tick);
-        }
-    }
-
-    tick();
-}
-
+    
 async function scanBarcodes() {
     const video = document.getElementById('scanner-video');
     const canvas = document.createElement('canvas');
@@ -1695,7 +1579,7 @@ async function scanBarcodes() {
 
     scanning = true;
 
-    async function tick() {
+    async function processFrame() {
         if (!scanning) return;
 
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
@@ -1706,7 +1590,7 @@ async function scanBarcodes() {
             try {
                 // 圖像預處理
                 let imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                imageData = await processFrame(context, imageData);
+                imageData = await processImageData(context, imageData);
 
                 // 嘗試QR碼識別
                 const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
@@ -1790,39 +1674,42 @@ async function scanBarcodes() {
         }
 
         if (scanning) {
-            requestAnimationFrame(tick);
+            requestAnimationFrame(processFrame);
         }
     }
 
-    tick();
-}
+    // 確保video已經準備好再開始掃描
+    video.addEventListener('canplay', () => {
+        processFrame();
+    });
 
-function closeScanner() {
-    const modal = document.getElementById('scannerModal');
-    const video = document.getElementById('scanner-video');
-    
+}function closeScanner() {
     scanning = false;
     
+    const video = document.getElementById('scanner-video');
+    const modal = document.getElementById('scannerModal');
+    
+    // 清理定時器
     if (video.dataset.focusInterval) {
         clearInterval(parseInt(video.dataset.focusInterval));
         delete video.dataset.focusInterval;
     }
     
+    // 停止所有視訊軌道
     if (video.srcObject) {
-        const tracks = video.srcObject.getTracks();
-        tracks.forEach(track => {
-            track.stop();
-        });
+        video.srcObject.getTracks().forEach(track => track.stop());
         video.srcObject = null;
     }
     
+    // 隱藏模態框
     modal.style.display = 'none';
     
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    context.clearRect(0, 0, canvas.width, canvas.height);
+    // 重置掃描狀態
+    const resultDisplay = document.querySelector('.scan-result-display');
+    if (resultDisplay) {
+        resultDisplay.style.display = 'none';
+    }
 }
-
 // 顯示 Loading
 function showLoading() {
     const modal = document.createElement('div');
@@ -1959,10 +1846,12 @@ function handleItemCode(itemCode) {
 function resetScanner() {
     if (!scanning) {
         scanning = true;
-        scanBarcodes();
+        const video = document.getElementById('scanner-video');
+        if (video && video.srcObject) {
+            scanBarcodes();
+        }
     }
 }
-
 function displayScanResultWithQrCode(message, itemCode, isSuccess, autoReset = true) {
     const resultDisplay = document.querySelector('.scan-result-display');
 
