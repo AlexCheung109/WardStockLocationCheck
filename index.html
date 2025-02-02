@@ -1622,10 +1622,6 @@ function handleItemCode(itemCode) {
     const selectedWard = document.getElementById('wardSelect').value;
     if (!selectedWard) {
         displayScanResult('請先選擇病房', false);
-        // 重置掃描器
-        setTimeout(() => {
-            resetScanner();
-        }, 2000);
         return;
     }
 
@@ -1651,10 +1647,8 @@ function handleItemCode(itemCode) {
             (selectedWard.toUpperCase() === 'B6' || selectedWard.toUpperCase() === 'D6') && 
             (itemInfo.location.startsWith('***E') || itemInfo.location.startsWith('**E'))
         ) {
-            // 如果是 B6 或 D6 病房，並且位置符合條件，顯示 QR Code 和文字結果
             displayScanResultWithQrCode(resultHTML, itemCode, true);
         } else {
-            // 其他病房，僅顯示文字結果
             displayScanResult(resultHTML, true);
         }
 
@@ -1662,18 +1656,12 @@ function handleItemCode(itemCode) {
         document.getElementById('itemCodeFilter').value = itemCode;
         filterItemCodes();
     } else {
-        // 未找到物品
-        displayScanResult(`此物品 (${itemCode}) 並非 ${selectedWard} 的 ward stock item`, false);
+        // 顯示找不到的訊息，但不應停止掃描
+        displayScanResult(`此物品未在系統中登記`, false);
     }
 
-    // 重要：重置掃描器狀態，準備下一次掃描
-    setTimeout(() => {
-        resetScanner();
-    }, 2000); // 延遲2秒後重置
+    // 不重置掃描器，保持連續掃描狀態
 }
-
-
-
 
 // 新增重置掃描器函數
 function resetScanner() {
