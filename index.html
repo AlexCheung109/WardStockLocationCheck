@@ -673,7 +673,17 @@ button:disabled {
 
 
 <script>
-
+const commonSettings = {
+    facingMode: "environment",
+    focusMode: 'continuous',
+    exposureMode: 'continuous',
+    whiteBalanceMode: 'continuous',
+    advanced: [
+        { focusMode: "continuous" },
+        { exposureMode: "continuous" },
+        { whiteBalanceMode: "continuous" }
+    ]
+};
 const CAMERA_SETTINGS = {
     highRes: {
         width: { ideal: 1920 },
@@ -692,17 +702,6 @@ const CAMERA_SETTINGS = {
     }
 };
 
-const commonSettings = {
-    facingMode: "environment",
-    focusMode: 'continuous',
-    exposureMode: 'continuous',
-    whiteBalanceMode: 'continuous',
-    advanced: [
-        { focusMode: "continuous" },
-        { exposureMode: "continuous" },
-        { whiteBalanceMode: "continuous" }
-    ]
-};
 
 
     let data = [];
@@ -1437,7 +1436,7 @@ let scanning = false;
 
 
 
-    modal.style.display = 'block';
+   
 
     // 嘗試不同相機設置的函數
  async function tryCamera(settings) {
@@ -1573,14 +1572,18 @@ async function processFrame(context, imageData) {
 }
 
     async function tick() {
-        if (!scanning) return;
+if (!scanning) return;
 
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvas.height = video.videoHeight;
-            canvas.width = video.videoWidth;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            try {
+    const video = document.getElementById('scanner-video');
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.height = video.videoHeight;
+        canvas.width = video.videoWidth;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        try {
                 // 圖像預處理
                 let imageData = context.getImageData(0, 0, canvas.width, canvas.height);
                 imageData = await processFrame(context, imageData);
