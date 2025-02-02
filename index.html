@@ -1434,10 +1434,10 @@ async function scanBarcodes() {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
 
-    scanning = true;
+    scanning = true; // 確保 scanning 始終為 true
 
     async function tick() {
-        if (!scanning) return;
+        if (!scanning) return; // 僅在 scanning 為 true 時繼續執行
 
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
             canvas.height = video.videoHeight;
@@ -1452,7 +1452,7 @@ async function scanBarcodes() {
                     console.log('QR Code detected:', qrResult.data);
                     const qrContent = normalizeBarcode(qrResult.data.trim());
                     handleItemCode(qrContent);
-                    return; // 停止進一步處理
+                    return; // 停止當前處理，但繼續掃描
                 }
 
                 // Data Matrix 和其他條碼處理
@@ -1470,19 +1470,19 @@ async function scanBarcodes() {
                 ]);
 
                 try {
-    const result = reader.decode(binaryBitmap, hints);
-    if (result) {
-        const scannedText = normalizeBarcode(result.text.trim());
-        const format = result.getBarcodeFormat();
-        console.log('Barcode detected:', format, scannedText);
-        processScannedBarcode(format, scannedText);
-   
-    }
-} catch (readerError) {
-    if (readerError.name !== 'NotFoundException') {
-        console.error('ZXing reader error:', readerError);
-    }
-}
+                    const result = reader.decode(binaryBitmap, hints);
+                    if (result) {
+                        const scannedText = normalizeBarcode(result.text.trim());
+                        const format = result.getBarcodeFormat();
+                        console.log('Barcode detected:', format, scannedText);
+                        processScannedBarcode(format, scannedText); // 繼續處理條碼
+                        return; // 停止當前處理，但繼續掃描
+                    }
+                } catch (readerError) {
+                    if (readerError.name !== 'NotFoundException') {
+                        console.error('ZXing reader error:', readerError);
+                    }
+                }
             } catch (error) {
                 console.error('General scanning error:', error);
             }
@@ -1493,8 +1493,10 @@ async function scanBarcodes() {
         }
     }
 
-    tick();
+    tick(); // 啟動掃描循環
 }
+
+
 function processScannedBarcode(format, scannedText) {
     if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
         handleDataMatrix(scannedText);
@@ -1657,7 +1659,7 @@ function handleItemCode(itemCode) {
         filterItemCodes();
     } else {
         // 顯示找不到的訊息，但不應停止掃描
-        displayScanResult(`此物品未在系統中登記`, false);
+        displayScanResult(`此物品 (${itemCode}) 未在系統中登記`, false);
     }
 
     // 不重置掃描器，保持連續掃描狀態
