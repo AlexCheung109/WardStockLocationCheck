@@ -1465,8 +1465,8 @@ async function scanBarcodes() {
                     ZXing.BarcodeFormat.DATA_MATRIX,
                     ZXing.BarcodeFormat.EAN_13,
                     ZXing.BarcodeFormat.CODE_128,
-                    ZXing.BarcodeFormat.UPC_A, // 支援 UPC-A 條碼格式
-                    ZXing.BarcodeFormat.PZN    // 支援 PZN 條碼格式
+                    ZXing.BarcodeFormat.UPC_A,
+                    ZXing.BarcodeFormat.PZN
                 ]);
 
                 try {
@@ -1496,7 +1496,6 @@ async function scanBarcodes() {
     tick(); // 啟動掃描循環
 }
 
-
 function processScannedBarcode(format, scannedText) {
     if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
         handleDataMatrix(scannedText);
@@ -1511,6 +1510,9 @@ function processScannedBarcode(format, scannedText) {
     } else {
         handleItemCode(scannedText);
     }
+
+    // 確保掃描循環繼續運行
+    requestAnimationFrame(scanBarcodes);
 }
 
 function autoRestartScanner() {
@@ -1527,26 +1529,20 @@ function closeScanner() {
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
     
-    // Reset scanning state
+    // 停止掃描
     scanning = false;
-    
-    // Stop video stream
+
+    // 停止視頻流
     if (video.srcObject) {
         const tracks = video.srcObject.getTracks();
-        tracks.forEach(track => {
-            track.stop();
-        });
+        tracks.forEach(track => track.stop());
         video.srcObject = null;
     }
-    
-    // Hide modal
+
+    // 隱藏模態框
     modal.style.display = 'none';
-    
-    // Additional cleanup
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    context.clearRect(0, 0, canvas.width, canvas.height);
 }
+
 
 // 顯示 Loading
 function showLoading() {
@@ -1667,14 +1663,14 @@ function handleItemCode(itemCode) {
 
 // 新增重置掃描器函數
 function resetScanner() {
+    // 停止視頻流
     const video = document.getElementById('scanner-video');
     if (video.srcObject) {
         const tracks = video.srcObject.getTracks();
         tracks.forEach(track => track.stop());
     }
-
-    scanning = false;
-   }
+    scanning = false; // 停止掃描循環
+}
 
 function displayScanResultWithQrCode(message, itemCode, isSuccess, autoReset = true) {
     const resultDisplay = document.querySelector('.scan-result-display');
