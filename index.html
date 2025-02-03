@@ -1414,21 +1414,10 @@ function startScanner() {
     modal.style.display = 'block';
     
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: "environment",
-                width: { ideal: 3840 },
-                height: { ideal: 2160 },
-                advanced: [{
-                    focusMode: ['continuous-picture', 'continuous-video', 'auto'],
-                    autoFocus: true,
-                    zoom: true,
-                    brightness: { ideal: 100 },
-                    contrast: { ideal: 95 },
-                    sharpness: { ideal: 85 },
-                    imageStabilization: true
-                }]
-            }
+        navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: "environment"
+            } 
         })
         .then(function(stream) {
             video.srcObject = stream;
