@@ -14,6 +14,27 @@
 
 
     <style>
+.focus-indicator {
+    position: absolute;
+    width: 70px;
+    height: 70px;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    display: none;
+    pointer-events: none;
+    animation: focus-animation 0.5s ease-out;
+}
+
+@keyframes focus-animation {
+    0% {
+        transform: scale(1.2);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
 
 .result-container {
     display: flex;
@@ -440,6 +461,7 @@ button:disabled {
     height: 300px;
     margin-bottom: 10px;
     overflow: hidden;
+    cursor: pointer; /* 添加指针样式 */
 }
 
 #scanner-video {
@@ -672,6 +694,18 @@ button:disabled {
     let data = [];
     let wards = new Set();
     let cupboardData = [];
+
+    function preprocessImage(imageData) {
+        // 增加對比度
+        for (let i = 0; i < imageData.data.length; i += 4) {
+            imageData.data[i] = imageData.data[i] * 1.2;     // R
+            imageData.data[i+1] = imageData.data[i+1] * 1.2; // G
+            imageData.data[i+2] = imageData.data[i+2] * 1.2; // B
+        }
+        return imageData;
+    }
+
+
     let cupboardWards = new Set();
     let itemDescriptions = new Map();
 let productIdMap = new Map();
@@ -1380,7 +1414,6 @@ function handleWardSelection() {
 
 let codeReader;
 let scanning = false;
-
 function startScanner() {
     const selectedWard = document.getElementById('wardSelect').value;
     if (!selectedWard) {
@@ -1413,11 +1446,61 @@ function startScanner() {
 
     modal.style.display = 'block';
     
+    // 创建对焦指示器
+    const focusIndicator = document.createElement('div');
+    focusIndicator.className = 'focus-indicator';
+    document.getElementById('scanner-container').appendChild(focusIndicator);
+
+    // 添加点击对焦事件
+    document.getElementById('scanner-container').addEventListener('click', async (e) => {
+        const rect = e.target.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // 显示对焦指示器
+        focusIndicator.style.display = 'block';
+        focusIndicator.style.left = (x - 35) + 'px';
+        focusIndicator.style.top = (y - 35) + 'px';
+
+        // 3秒后隐藏对焦指示器
+        setTimeout(() => {
+            focusIndicator.style.display = 'none';
+        }, 3000);
+
+        try {
+            const track = video.srcObject.getVideoTracks()[0];
+            const capabilities = track.getCapabilities();
+            
+            if (capabilities.focusMode && capabilities.focusMode.includes('manual')) {
+                await track.applyConstraints({
+                    advanced: [{
+                        focusMode: 'manual',
+                        focusDistance: capabilities.focusDistance.max / 2
+                    }]
+                });
+            }
+        } catch (error) {
+            console.error('对焦失败:', error);
+        }
+    });
+    
+    // 高級相機初始化
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ 
-            video: { 
-                facingMode: "environment"
-            } 
+        navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: "environment",
+                width: { ideal: 3840 },
+                height: { ideal: 2160 },
+                advanced: [{
+                    focusMode: ['continuous-picture', 'continuous-video', 'auto'],
+                    autoFocus: true,
+                    zoom: true,
+                    brightness: { ideal: 100 },
+                    contrast: { ideal: 95 },
+                    sharpness: { ideal: 85 },
+                    imageStabilization: true
+                }]
+            }
         })
         .then(function(stream) {
             video.srcObject = stream;
@@ -1427,11 +1510,57 @@ function startScanner() {
             scanBarcodes();
         })
         .catch(function(error) {
-            console.error("Camera error: ", error);
-            alert("Error accessing camera. Please make sure you have granted camera permissions.");
+            handleCameraError(error);
         });
     }
 }
+
+// 相機錯誤處理函數
+function handleCameraError(error) {
+    console.error('相機設置錯誤:', error);
+    let errorMessage = '相機訪問錯誤: ';
+    
+    switch(error.name) {
+        case 'NotAllowedError':
+            errorMessage += '請允許使用相機權限';
+            break;
+        case 'NotFoundError':
+            errorMessage += '未找到可用的相機設備';
+            break;
+        case 'NotReadableError':
+            errorMessage += '相機可能被其他應用程序佔用';
+            break;
+        case 'OverconstrainedError':
+            errorMessage += '相機不支持請求的設置，使用默認設置';
+            retryWithLowerSettings();
+            return;
+        default:
+            errorMessage += error.message;
+    }
+    
+    alert(errorMessage);
+}
+
+function retryWithLowerSettings() {
+    navigator.mediaDevices.getUserMedia({
+        video: {
+            facingMode: "environment",
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+        }
+    })
+    .then(function(stream) {
+        video.srcObject = stream;
+        video.setAttribute('playsinline', true);
+        video.play();
+        scanning = true;
+        scanBarcodes();
+    })
+    .catch(function(error) {
+        alert('無法使用相機，請檢查權限設置');
+    });
+}
+
 async function scanBarcodes() {
     const video = document.getElementById('scanner-video');
     const canvas = document.createElement('canvas');
@@ -1447,10 +1576,17 @@ async function scanBarcodes() {
             canvas.width = video.videoWidth;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
+            // 進行圖像預處理
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            const processedImage = preprocessImage(imageData);
+            context.putImageData(processedImage, 0, 0);
+
             try {
-                // QR Code processing
-                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+                // QR Code processing with processed image
+                const qrResult = jsQR(processedImage.data, processedImage.width, processedImage.height, {
+                    inversionAttempts: "dontInvert",
+                });
+
                 if (qrResult) {
                     console.log('QR Code detected:', qrResult.data);
                     const qrContent = qrResult.data;
@@ -1459,6 +1595,7 @@ async function scanBarcodes() {
                         if (fMatch && fMatch[1]) {
                             scanning = false;
                             handleItemCode(fMatch[1]);
+                            return;
                         }
                     }
                 }
@@ -1548,10 +1685,18 @@ async function scanBarcodes() {
 
     tick();
 }
+
+
 function closeScanner() {
     const modal = document.getElementById('scannerModal');
     const video = document.getElementById('scanner-video');
+    const focusIndicator = document.querySelector('.focus-indicator');
     
+    // 移除对焦指示器
+    if (focusIndicator) {
+        focusIndicator.remove();
+    }
+
     // Reset scanning state
     scanning = false;
     
@@ -1572,7 +1717,6 @@ function closeScanner() {
     const context = canvas.getContext('2d');
     context.clearRect(0, 0, canvas.width, canvas.height);
 }
-
 // 顯示 Loading
 function showLoading() {
     const modal = document.createElement('div');
