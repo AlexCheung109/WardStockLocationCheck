@@ -1574,15 +1574,26 @@ async function scanBarcodes() {
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
             canvas.height = video.videoHeight;
             canvas.width = video.videoWidth;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            // 進行圖像預處理
+            // 1. 先擷取中心區域
+            const centerX = (video.videoWidth - video.videoWidth * 0.8) / 2;
+            const centerY = (video.videoHeight - video.videoHeight * 0.8) / 2;
+            const centerWidth = video.videoWidth * 0.8;
+            const centerHeight = video.videoHeight * 0.8;
+
+            context.drawImage(
+                video,
+                centerX, centerY, centerWidth, centerHeight,
+                0, 0, canvas.width, canvas.height
+            );
+
+            // 2. 進行圖像預處理
             const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
             const processedImage = preprocessImage(imageData);
             context.putImageData(processedImage, 0, 0);
 
             try {
-                // QR Code processing with processed image
+                // 3. QR Code 處理
                 const qrResult = jsQR(processedImage.data, processedImage.width, processedImage.height, {
                     inversionAttempts: "dontInvert",
                 });
@@ -1600,7 +1611,7 @@ async function scanBarcodes() {
                     }
                 }
 
-                // Data Matrix and other barcode processing
+                // 4. 其他條碼處理
                 const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
                 const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
                 const reader = new ZXing.MultiFormatReader();
@@ -1611,6 +1622,7 @@ async function scanBarcodes() {
                     ZXing.BarcodeFormat.EAN_13,
                     ZXing.BarcodeFormat.CODE_128
                 ]);
+                hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
                 
                 try {
                     const result = reader.decode(binaryBitmap, hints);
@@ -1619,10 +1631,10 @@ async function scanBarcodes() {
                         const format = result.getBarcodeFormat();
                         console.log('Barcode detected:', format, scannedText);
 
-                        scanning = false; // 暫停掃描
+                        scanning = false;
 
-                        // Data Matrix handling
                         if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
+                            // Data Matrix 處理邏輯
                             try {
                                 let cleanText = scannedText.replace(/[^0-9]/g, '');
                                 let match = cleanText.match(/^01\d{13}/);
@@ -1635,38 +1647,31 @@ async function scanBarcodes() {
                                         handleItemCode(itemCode);
                                     } else {
                                         displayScanResult(`未找到對應商品代碼<br>掃描內容：${productId}`, false);
-                                        setTimeout(() => {
-                                            resetScanner();
-                                        }, 2000);
+                                        setTimeout(resetScanner, 2000);
                                     }
                                 } else {
                                     displayScanResult(`無法提取完整15位數字<br>當前內容：${cleanText}`, false);
-                                    setTimeout(() => {
-                                        resetScanner();
-                                    }, 2000);
+                                    setTimeout(resetScanner, 2000);
                                 }
                             } catch (error) {
                                 console.error('處理錯誤:', error);
                                 displayScanResult('處理條碼時發生錯誤', false);
-                                setTimeout(() => {
-                                    resetScanner();
-                                }, 2000);
+                                setTimeout(resetScanner, 2000);
                             }
                         }
-                        // EAN-13 或 CODE-128 處理
                         else if (format === ZXing.BarcodeFormat.EAN_13 || 
                                 format === ZXing.BarcodeFormat.CODE_128) {
+                            // 一維碼處理邏輯
                             const normalizedText = normalizeBarcode(scannedText);
                             const itemCode = productIdMap.get(normalizedText);
                             if (itemCode) {
                                 handleItemCode(itemCode);
                             } else {
                                 displayScanResult(`條碼未在系統中登記<br>掃描內容：${normalizedText}`, false);
-                                setTimeout(() => {
-                                    resetScanner();
-                                }, 2000);
+                                setTimeout(resetScanner, 2000);
                             }
                         }
+                        return;
                     }
                 } catch (readerError) {
                     if (readerError.name !== 'NotFoundException') {
