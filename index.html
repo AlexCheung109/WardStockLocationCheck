@@ -1496,7 +1496,7 @@ async function scanBarcodes() {
                                 }
 
 
-                                let match = cleanText.match(/^01\d{13}/);
+                                let match = cleanText.match(/^\d{15}$/);
                                 
                                 if (match) {
                                     let productId = match[0];
@@ -1510,6 +1510,23 @@ async function scanBarcodes() {
                                             resetScanner();
                                         }, 2000);
                                     }
+
+// 新增處理純15位數字條碼的邏輯
+else if (cleanText.length === 15) {
+    const productId = cleanText;
+    const itemCode = productIdMap.get(productId);
+
+    if (itemCode) {
+        handleItemCode(itemCode);
+    } else {
+        displayScanResult(`未找到對應商品代碼<br>掃描內容：${productId}`, false);
+        setTimeout(() => {
+            resetScanner();
+        }, 2000);
+    }
+} 
+
+
                                 } else {
                                     displayScanResult(`條碼格式有誤<br>當前內容：${cleanText}`, false);
                                     setTimeout(() => {
