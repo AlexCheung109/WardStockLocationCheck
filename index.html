@@ -1488,6 +1488,14 @@ async function scanBarcodes() {
                         if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
                             try {
                                 let cleanText = scannedText.replace(/[^0-9]/g, '');
+
+                                // 處理少於15位數字的條碼
+                                if (cleanText.length < 15) {
+                                    console.warn(`條碼少於15位數，進行補零: ${cleanText}`);
+                                    cleanText = cleanText.padEnd(15, '0'); // 補零
+                                }
+
+
                                 let match = cleanText.match(/^01\d{13}/);
                                 
                                 if (match) {
@@ -1503,7 +1511,7 @@ async function scanBarcodes() {
                                         }, 2000);
                                     }
                                 } else {
-                                    displayScanResult(`無法提取完整15位數字<br>當前內容：${cleanText}`, false);
+                                    displayScanResult(`條碼格式有誤<br>當前內容：${cleanText}`, false);
                                     setTimeout(() => {
                                         resetScanner();
                                     }, 2000);
