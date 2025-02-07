@@ -1514,7 +1514,7 @@ async function scanBarcodes() {
 }
 // 新增處理純15位數字條碼的邏輯
 else if (cleanText.length >= 15) {
-    const productId = cleanText.SUBSTRING(0,15);
+    const productId = cleanText.substring(0,15);
     const itemCode = productIdMap.get(productId);
 
     if (itemCode) {
