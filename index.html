@@ -1488,7 +1488,7 @@ async function scanBarcodes() {
                         // Data Matrix handling
                         if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
                             try {
-                                let cleanText = scannedText.replace(/^\d{15}$/);
+                                let cleanText = scannedText.match(/\d+/g)?.join('') || '';
 
                                 // 處理少於15位數字的條碼
                                 if (cleanText.length < 15) {
