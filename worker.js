@@ -1,4 +1,3 @@
-// worker.js
 self.importScripts('https://unpkg.com/@zxing/library@latest/umd/index.min.js');
 
 self.onmessage = function(e) {
