@@ -706,7 +706,7 @@ button:disabled {
     };
 
     // Initialize Web Worker
-    const worker = new Worker('/WardStockLocationCheck/worker.js');
+    const worker = new Worker('https://AlexCheung109.github.io/WardStockLocationCheck/worker.js');
 
     async function getFileLastUpdateDate(filename) {
         try {
@@ -1428,8 +1428,13 @@ button:disabled {
         if (itemCode) {
             handleItemCode(itemCode);
         } else {
-            displayScanResult(`Barcode not recognized: ${normalizedText}`, false);
-            setTimeout(() => resetScanner(), 2000);
+           const errorMessage = `
+            <p><span class="highlight">狀態:</span> 未在系統中登記</p>
+            <p><span class="highlight">掃描到的條碼:</span> ${normalizedText}</p>
+            <p><span class="highlight">條碼格式:</span> ${formatName}</p>
+        `;
+        displayScanResult(errorMessage, false);
+        setTimeout(() => resetScanner(), 2000);
         }
     }
 
