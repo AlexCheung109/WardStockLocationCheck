@@ -568,7 +568,7 @@
         <div id="scannerModal" class="scanner-modal">
             <div class="scanner-content">
                 <!-- Close Button -->
-                <button class="close-button" onclick="closeScanner()">&times;</button>
+                <button class="close-button" onclick="closeScanner()">×</button>
 
                 <!-- Scanner Video -->
                 <div id="scanner-container">
@@ -1407,20 +1407,8 @@
                     video.setAttribute('playsinline', true);
                     video.play();
                     scanning = true;
-                    frameCounter = 0; // 重置幀計數器
-                    // 嘗試開啟閃光燈
-                    try {
-                        const track = stream.getVideoTracks()[0];
-                        const capabilities = track.getCapabilities();
-                        if (capabilities.torch) {
-                            track.applyConstraints({
-                                advanced: [{ torch: true }]
-                            }).catch(e => console.log("Torch not supported: ", e));
-                        }
-                    } catch (err) {
-                        console.log("Torch error:", err);
-                    }
-                    // 添加1秒延遲以確保相機聚焦穩定
+                    frameCounter = 0; // 初始化幀計數器
+                    // 延遲1秒開始掃描，確保聚焦穩定
                     setTimeout(() => {
                         scanBarcodes();
                     }, 1000);
