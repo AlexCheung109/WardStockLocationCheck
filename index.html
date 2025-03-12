@@ -11,6 +11,10 @@
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <!-- 在 head 部分添加，在其他 script 標籤後面 -->
     <script src="https://unpkg.com/@zxing/library@latest"></script>
+    <!-- 新增 jQuery 和 jQuery UI 用於自動完成功能 -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
 
     <style>
         .result-container {
@@ -516,6 +520,45 @@
                 width: 100%;
             }
         }
+        /* 新增樣式：密碼和表單模態窗口 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        .modal-content {
+            position: relative;
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .modal-content input[type="text"],
+        .modal-content input[type="password"] {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .modal-content button {
+            margin: 10px 5px 0 0;
+        }
+        .error-message {
+            color: red;
+            font-size: 14px;
+            margin-top: 10px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -586,6 +629,32 @@
                 <div class="scan-result-display" style="display: none;">
                     <div class="scan-result-content"></div>
                 </div>
+            </div>
+        </div>
+
+        <!-- 新增：密碼輸入模態窗口 -->
+        <div id="passwordFormModal" class="modal">
+            <div class="modal-content">
+                <h2>Enter Password</h2>
+                <input type="password" id="passwordInput" placeholder="Password">
+                <button onclick="submitPassword()">Submit</button>
+                <button onclick="closePasswordForm()">Cancel</button>
+                <div id="passwordError" class="error-message"></div>
+            </div>
+        </div>
+
+        <!-- 新增：添加產品 ID 的表單模態窗口 -->
+        <div id="additionFormModal" class="modal">
+            <div class="modal-content">
+                <h2>Add New Product ID</h2>
+                <label for="itemCodeInput">Item Code:</label>
+                <input type="text" id="itemCodeInput" placeholder="Enter Item Code">
+                <label for="itemDescriptionInput">Item Description:</label>
+                <input type="text" id="itemDescriptionInput" readonly>
+                <label for="productIdInput">Product ID:</label>
+                <input type="text" id="productIdInput" readonly>
+                <button onclick="confirmAddition()">Confirm</button>
+                <button onclick="closeAdditionForm()">Cancel</button>
             </div>
         </div>
 
@@ -670,6 +739,8 @@
         let cupboardWards = new Set();
         let itemDescriptions = new Map();
         let productIdMap = new Map();
+        let itemCodes = []; // 新增：用於自動完成的 Item Code 列表
+        let currentScannedProductId = ''; // 新增：儲存當前掃描的 Product ID
 
         // Mapping for Duty and Weekday to Scanner
         const dutyWeekdayScannerMap = {
@@ -739,6 +810,8 @@
                 itemDescriptions = new Map(
                     itemData.map(row => [row.itemCode.toString(), shortenDescription(row.description)])
                 );
+                // 新增：提取 Item Codes 用於自動完成
+                itemCodes = itemData.map(row => row.itemCode.toString());
             } catch (error) {
                 console.error('Error loading item descriptions:', error);
                 document.getElementById('error').textContent = 'Error loading item descriptions: ' + error.message;
@@ -1483,10 +1556,11 @@
                                             if (itemCode) {
                                                 handleItemCode(itemCode);
                                             } else {
-                                                displayScanResult(`未找到對應商品代碼<br>掃描內容：${productId}`, false);
-                                                setTimeout(() => {
-                                                    resetScanner();
-                                                }, 2000);
+                                                displayAddProductIdButton(productId);
+                                                //displayScanResult(`未找到對應商品代碼<br>掃描內容：${productId}`, false);
+                                                //setTimeout(() => {
+                                                //    resetScanner();
+                                                //}, 2000);
                                             }
                                         } 
                                         // 兼容處理 ≥15位
@@ -1496,10 +1570,11 @@
                                             if (itemCode) {
                                                 handleItemCode(itemCode);
                                             } else {
-                                                displayScanResult(`未找到對應商品代碼<br>掃描內容：${productId}`, false);
-                                                setTimeout(() => {
-                                                    resetScanner();
-                                                }, 2000);
+                                                displayAddProductIdButton(productId);
+                                                //displayScanResult(`未找到對應商品代碼<br>掃描內容：${productId}`, false);
+                                                //setTimeout(() => {
+                                                //    resetScanner();
+                                                //}, 2000);
                                             }
                                         } 
                                         else {
@@ -1524,10 +1599,11 @@
                                     if (itemCode) {
                                         handleItemCode(itemCode);
                                     } else {
-                                        displayScanResult(`條碼未在系統中登記<br>掃描內容：${normalizedText}`, false);
-                                        setTimeout(() => {
-                                            resetScanner();
-                                        }, 2000);
+                                        displayAddProductIdButton(normalizedText);
+                                        //displayScanResult(`條碼未在系統中登記<br>掃描內容：${normalizedText}`, false);
+                                        //setTimeout(() => {
+                                        //    resetScanner();
+                                        //}, 2000);
                                     }
                                 }
                             }
@@ -1747,6 +1823,183 @@
                     }, resetDelay);
                 }
             }
+        }
+
+        // 新增：顯示 ADD Product ID 按鈕
+        function displayAddProductIdButton(scannedProductId) {
+            currentScannedProductId = scannedProductId;
+            const resultDisplay = document.querySelector('.scan-result-display');
+            if (resultDisplay) {
+                resultDisplay.style.display = 'block';
+                const displayContent = `
+                    <div class="text-result-section error">
+                        未找到對應商品代碼<br>掃描內容：${scannedProductId}
+                        <br><button onclick="showPasswordForm()">ADD Product ID</button>
+                    </div>
+                `;
+                resultDisplay.innerHTML = displayContent;
+            }
+        }
+
+        // 新增：顯示密碼輸入表單
+        function showPasswordForm() {
+            const modal = document.getElementById('passwordFormModal');
+            modal.style.display = 'block';
+            document.getElementById('passwordInput').value = '';
+            document.getElementById('passwordError').textContent = '';
+        }
+
+        // 新增：關閉密碼輸入表單
+        function closePasswordForm() {
+            document.getElementById('passwordFormModal').style.display = 'none';
+            setTimeout(() => {
+                resetScanner();
+            }, 500); // 延遲重置掃描器
+        }
+
+        // 新增：提交密碼
+        function submitPassword() {
+            const password = document.getElementById('passwordInput').value;
+            if (password === 'CTC109') {
+                document.getElementById('passwordFormModal').style.display = 'none';
+                showAdditionForm(currentScannedProductId);
+            } else {
+                document.getElementById('passwordError').textContent = 'Incorrect password';
+            }
+        }
+
+        // 新增：顯示添加產品 ID 表單
+        function showAdditionForm(productId) {
+            const modal = document.getElementById('additionFormModal');
+            modal.style.display = 'block';
+            document.getElementById('itemCodeInput').value = '';
+            document.getElementById('itemDescriptionInput').value = '';
+            document.getElementById('productIdInput').value = productId;
+
+            // 初始化自動完成功能
+            $("#itemCodeInput").autocomplete({
+                source: itemCodes,
+                minLength: 2,
+                select: function(event, ui) {
+                    const selectedItemCode = ui.item.value;
+                    const description = itemDescriptions.get(selectedItemCode) || 'No description available';
+                    document.getElementById('itemDescriptionInput').value = description;
+                }
+            });
+        }
+
+        // 新增：關閉添加產品 ID 表單
+        function closeAdditionForm() {
+            document.getElementById('additionFormModal').style.display = 'none';
+            setTimeout(() => {
+                resetScanner();
+            }, 500); // 延遲重置掃描器
+        }
+
+        // 新增：確認添加產品 ID
+        function confirmAddition() {
+            const itemCode = document.getElementById('itemCodeInput').value.trim();
+            const productId = document.getElementById('productIdInput').value.trim();
+
+            if (!itemCode) {
+                alert('Please enter an Item Code');
+                return;
+            }
+
+            const confirmation = confirm(`是否將 ${productId} 與 ${itemCode} 加入至 Product_ID.xlsx 內？`);
+            if (confirmation) {
+                updateProductIdFile(itemCode, productId);
+            }
+        }
+
+        // 新增：更新 Product_ID.xlsx 文件
+        async function updateProductIdFile(itemCode, productId) {
+            const path = 'Product_ID.xlsx';
+            const owner = 'AlexCheung109';
+            const repo = 'WardStockLocationCheck';
+            const token = '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';
+
+            try {
+                // 獲取當前文件內容
+                const fileData = await getFileContent(path);
+                const content = fileData.content;
+                const sha = fileData.sha;
+
+                // 解碼 Base64 並解析 Excel 文件
+                const binaryString = atob(content);
+                const arrayBuffer = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    arrayBuffer[i] = binaryString.charCodeAt(i);
+                }
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+
+                // 將數據轉為陣列
+                const sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                if (sheetData.length === 0) {
+                    sheetData.push(['itemCode', 'productId']); // 添加標題行
+                }
+
+                // 添加新行
+                sheetData.push([itemCode, productId]);
+
+                // 更新工作表
+                const newWorksheet = XLSX.utils.aoa_to_sheet(sheetData);
+                workbook.Sheets[sheetName] = newWorksheet;
+
+                // 轉換為 Base64
+                const newExcelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+                const newContent = btoa(String.fromCharCode.apply(null, new Uint8Array(newExcelBuffer)));
+
+                // 更新文件
+                await updateFile(path, newContent, sha);
+
+                alert('Product ID added successfully!');
+                closeAdditionForm();
+
+                // 重新載入 Product ID 映射
+                await loadProductIds();
+            } catch (error) {
+                console.error('Error updating Product_ID.xlsx:', error);
+                alert('Failed to update Product_ID.xlsx: ' + error.message);
+            }
+        }
+
+        // 新增：從 GitHub 獲取文件內容
+        async function getFileContent(path) {
+            const url = `https://api.github.com/repos/AlexCheung109/WardStockLocationCheck/contents/${path}`;
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': `token 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`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            if (!response.ok) {
+                throw new Error(`Failed to fetch file: ${response.statusText}`);
+            }
+            return await response.json();
+        }
+
+        // 新增：更新 GitHub 文件
+        async function updateFile(path, content, sha) {
+            const url = `https://api.github.com/repos/AlexCheung109/WardStockLocationCheck/contents/${path}`;
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token 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`,
+                    'Accept': 'application/vnd.github.v3+json'
+                },
+                body: JSON.stringify({
+                    message: `Add new Product ID mapping: ${content.slice(0, 50)}...`,
+                    content: content,
+                    sha: sha
+                })
+            });
+            if (!response.ok) {
+                throw new Error(`Failed to update file: ${response.statusText}`);
+            }
+            return await response.json();
         }
     </script>
 </body>
