@@ -10,7 +10,7 @@
     <!-- Include jsQR Library -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <!-- 在 head 部分添加，在其他 script 標籤後面 -->
-    <script src="https://unpkg.com/@zxing/library@latest"></script>
+   sheetjs/sheetjs)    <script src="https://unpkg.com/@zxing/library@latest"></script>
     <!-- 新增 jQuery 和 jQuery UI 用於自動完成功能 -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
@@ -40,7 +40,7 @@
             align-items: center;
             justify-content: center;
             width: 100%;
-            border-bottom: 1px solid #ddd;
+            border GROWbottom: 1px solid #ddd;
         }
 
         .qr-code-section canvas {
@@ -534,11 +534,13 @@
         .modal-content {
             position: relative;
             background-color: white;
-            margin: 15% auto;
+            margin: 10% auto;
             padding: 20px;
             border-radius: 8px;
             width: 90%;
-            max-width: 400px;
+            max-width: 90vw; /* 根據螢幕寬度調整 */
+            max-height: 80vh; /* 限制高度為螢幕的80% */
+            overflow-y: auto; /* 啟用垂直滾動 */
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
         .modal-content input[type="text"],
@@ -549,15 +551,25 @@
             border: 1px solid #ddd;
             border-radius: 4px;
             box-sizing: border-box;
+            font-size: 16px; /* 增大字體適應手機 */
         }
         .modal-content button {
             margin: 10px 5px 0 0;
+            padding: 12px 24px; /* 增大按鈕適應手機觸控 */
         }
         .error-message {
             color: red;
             font-size: 14px;
             margin-top: 10px;
             text-align: center;
+        }
+        /* 自動完成下拉選單樣式 */
+        .ui-autocomplete {
+            max-height: 200px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            z-index: 2000 !important; /* 確保在模態窗口上方 */
+            font-size: 14px;
         }
     </style>
 </head>
@@ -611,7 +623,7 @@
         <div id="scannerModal" class="scanner-modal">
             <div class="scanner-content">
                 <!-- Close Button -->
-                <button class="close-button" onclick="closeScanner()">&times;</button>
+                <button class="close-button" onclick="closeScanner()">×</button>
 
                 <!-- Scanner Video -->
                 <div id="scanner-container">
@@ -739,8 +751,8 @@
         let cupboardWards = new Set();
         let itemDescriptions = new Map();
         let productIdMap = new Map();
-        let itemCodes = []; // 新增：用於自動完成的 Item Code 列表
-        let currentScannedProductId = ''; // 新增：儲存當前掃描的 Product ID
+        let itemCodes = []; // 用於自動完成的 Item Code 列表
+        let currentScannedProductId = ''; // 儲存當前掃描的 Product ID
 
         // Mapping for Duty and Weekday to Scanner
         const dutyWeekdayScannerMap = {
@@ -810,8 +822,8 @@
                 itemDescriptions = new Map(
                     itemData.map(row => [row.itemCode.toString(), shortenDescription(row.description)])
                 );
-                // 新增：提取 Item Codes 用於自動完成
-                itemCodes = itemData.map(row => row.itemCode.toString());
+                itemCodes = itemData.map(row => row.itemCode.toString()); // 提取 Item Codes 用於自動完成
+                console.log('Item Codes loaded:', itemCodes); // 調試用
             } catch (error) {
                 console.error('Error loading item descriptions:', error);
                 document.getElementById('error').textContent = 'Error loading item descriptions: ' + error.message;
@@ -915,9 +927,11 @@
                 });
                 
             } catch (error) {
+                console.error('Error loading product IDs:', error);
                 alert('載入產品對照表時發生錯誤');
             }
         }
+
         function normalizeBarcode(text) {
             return text.toString().trim().toUpperCase();
         }
@@ -976,7 +990,6 @@
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
                 
-                // Modify headers to include Weekday columns (Assuming columns B-F correspond to MON-FRI)
                 cupboardData = XLSX.utils.sheet_to_json(worksheet, {
                     header: ['ward', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'ignore1', 'wardStockCupboardLocation', 'fridgeLocation', 'concentratedElectrolyteCupboardLocation', 'remark'],
                     range: 1
@@ -1040,7 +1053,6 @@
                     <p class="location-value">${found.concentratedElectrolyteCupboardLocation || 'N/A'}</p>
                 `;
 
-                // Add Remark section if available
                 if (found.remark && found.remark.trim() !== '') {
                     resultHTML += `
                         <p class="location-label">Remark:</p>
@@ -1087,7 +1099,6 @@
             }
         }
 
-        // Helper function to parse ward into letters, number, and suffix
         function parseWard(ward) {
             const match = ward.match(/^([A-Za-z]+)(\d+)(.*)$/);
             if (match) {
@@ -1099,32 +1110,26 @@
             return { letters: '', number: 0, suffix: '' };
         }
 
-        // Custom sort function: first by number descending, then by letters ascending
         function sortWardsDesc(a, b) {
             const wa = parseWard(a);
             const wb = parseWard(b);
 
-            // Sort by number descending
             if (wa.number > wb.number) return -1;
             if (wa.number < wb.number) return 1;
 
-            // Then sort by letters ascending
             if (wa.letters < wb.letters) return -1;
             if (wa.letters > wb.letters) return 1;
 
-            // Finally, sort by suffix ascending
             if (wa.suffix < wb.suffix) return -1;
             if (wa.suffix > wb.suffix) return 1;
 
             return 0;
         }
 
-        // Function to display item codes as clickable accordions
         function displayItemCodes() {
             const selectedWard = document.getElementById('wardSelect').value;
             const resultDiv = document.getElementById('result');
 
-            // Clear previous results
             resultDiv.innerHTML = '';
             document.getElementById('qrCodeContainer').innerHTML = '';
 
@@ -1133,20 +1138,16 @@
                 return;
             }
 
-            // Fetch all item codes for the selected ward
             const wardItems = data
                 .filter(row => row.ward === selectedWard)
                 .map(row => row.itemCode)
                 .filter(itemCode => itemCode)
-                .sort(); // Sort A-Z
+                .sort();
 
             if (wardItems.length > 0) {
-                // Remove duplicates
                 const uniqueItemCodes = [...new Set(wardItems)];
-                // Sort unique item codes A-Z
                 uniqueItemCodes.sort();
 
-                // Create accordion-style details elements
                 let itemListHTML = `<h3>Item Codes in Ward ${selectedWard}:</h3>`;
                 uniqueItemCodes.forEach(itemCode => {
                     const found = data.find(row => row.ward === selectedWard && row.itemCode.toString() === itemCode.toString());
@@ -1163,14 +1164,12 @@
                                     <p class="location-label">Location:</p>
                                     <p class="location-value">${found.location || 'N/A'}</p>
                                     
-                                    <!-- 新增的描述和 QR Code 區塊 -->
                                     ${
                                         ( (selectedWard.toUpperCase() === 'B6' || selectedWard.toUpperCase() === 'D6') && 
                                           (found.location.startsWith('***E') || found.location.startsWith('**E')) )
                                         ? `
                                             <p class="location-label">Description:</p>
                                             <p class="location-value">Scan it to open the drug locker directly.</p>
-                                            
                                             <div class="qr-code">
                                                 <canvas id="qr-${itemCode}"></canvas>
                                                 <p class="item-code">Item Code: ${itemCode}</p>
@@ -1185,7 +1184,6 @@
                 });
                 resultDiv.innerHTML = itemListHTML;
 
-                // Enforce single-open accordion behavior
                 document.querySelectorAll('#result details').forEach(details => {
                     details.addEventListener('toggle', function() {
                         if (this.open) {
@@ -1196,14 +1194,12 @@
                     });
                 });
 
-                // 生成 QR Code
                 generateQRCodes(selectedWard, uniqueItemCodes);
             } else {
                 resultDiv.innerHTML = 'No item codes found for this ward';
             }
         }
 
-        // 新增的函數，用於生成 QR Code
         function generateQRCodes(selectedWard, uniqueItemCodes) {
             uniqueItemCodes.forEach(itemCode => {
                 const found = data.find(row => row.ward === selectedWard && row.itemCode.toString() === itemCode.toString());
@@ -1211,7 +1207,6 @@
                     (found.location.startsWith('***E') || found.location.startsWith('**E'))) {
                     const qrCanvas = document.getElementById(`qr-${itemCode}`);
                     if (qrCanvas) {
-                        // 使用 QRious 生成 QR Code
                         new QRious({
                             element: qrCanvas,
                             value: itemCode.toString(),
@@ -1222,7 +1217,6 @@
             });
         }
 
-        // Function to filter item codes based on input
         function filterItemCodes() {
             const filterValue = document.getElementById('itemCodeFilter').value.toLowerCase();
             const detailsElements = document.querySelectorAll('#result details');
@@ -1243,7 +1237,6 @@
             const resultDiv = document.getElementById('result');
             const qrCodeContainer = document.getElementById('qrCodeContainer');
 
-            // Clear previous QR code and descriptions
             qrCodeContainer.innerHTML = '';
 
             if (!selectedWard || !selectedItemCode) {
@@ -1308,7 +1301,6 @@
             }
         }
 
-        // Functions to handle Data Capture Schedule Tab
         function showFullSchedule() {
             document.getElementById('fullSchedule').style.display = 'block';
             document.getElementById('dutyQuery').style.display = 'none';
@@ -1413,7 +1405,7 @@
 
         async function autoSelectWeekday() {
             const currentDate = new Date();
-            const weekdayNumber = currentDate.getDay(); // Sunday - Saturday : 0 - 6
+            const weekdayNumber = currentDate.getDay();
             const weekdayMap = {
                 1: "Monday",
                 2: "Tuesday",
@@ -1501,7 +1493,6 @@
                     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
                     try {
-                        // QR Code processing
                         const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
                         const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
                         if (qrResult) {
@@ -1516,7 +1507,6 @@
                             }
                         }
 
-                        // Data Matrix and other barcode processing
                         const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
                         const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source));
                         const reader = new ZXing.MultiFormatReader();
@@ -1536,14 +1526,11 @@
                                 const format = result.getBarcodeFormat();
                                 console.log('Barcode detected:', format, scannedText);
 
-                                scanning = false; // 暫停掃描
+                                scanning = false;
 
-                                // Data Matrix handling
                                 if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
                                     try {
                                         let cleanText = scannedText.match(/\d+/g)?.join('') || '';
-
-                                        // 處理少於15位數字的條碼
                                         if (cleanText.length < 15) {
                                             console.warn(`條碼少於15位數，進行補零: ${cleanText}`);
                                             cleanText = cleanText.padEnd(15, '0');
@@ -1557,27 +1544,16 @@
                                                 handleItemCode(itemCode);
                                             } else {
                                                 displayAddProductIdButton(productId);
-                                                //displayScanResult(`未找到對應商品代碼<br>掃描內容：${productId}`, false);
-                                                //setTimeout(() => {
-                                                //    resetScanner();
-                                                //}, 2000);
                                             }
-                                        } 
-                                        // 兼容處理 ≥15位
-                                        else if (cleanText.length >= 15) {
+                                        } else if (cleanText.length >= 15) {
                                             const productId = cleanText.substring(0,15);
                                             const itemCode = productIdMap.get(productId);
                                             if (itemCode) {
                                                 handleItemCode(itemCode);
                                             } else {
                                                 displayAddProductIdButton(productId);
-                                                //displayScanResult(`未找到對應商品代碼<br>掃描內容：${productId}`, false);
-                                                //setTimeout(() => {
-                                                //    resetScanner();
-                                                //}, 2000);
                                             }
-                                        } 
-                                        else {
+                                        } else {
                                             displayScanResult(`條碼格式有誤<br>當前內容：${cleanText}`, false);
                                             setTimeout(() => {
                                                 resetScanner();
@@ -1590,9 +1566,7 @@
                                             resetScanner();
                                         }, 2000);
                                     }
-                                }
-                                // EAN-13 或 CODE-128 處理
-                                else if (format === ZXing.BarcodeFormat.EAN_13 || 
+                                } else if (format === ZXing.BarcodeFormat.EAN_13 || 
                                         format === ZXing.BarcodeFormat.CODE_128) {
                                     const normalizedText = normalizeBarcode(scannedText);
                                     const itemCode = productIdMap.get(normalizedText);
@@ -1600,10 +1574,6 @@
                                         handleItemCode(itemCode);
                                     } else {
                                         displayAddProductIdButton(normalizedText);
-                                        //displayScanResult(`條碼未在系統中登記<br>掃描內容：${normalizedText}`, false);
-                                        //setTimeout(() => {
-                                        //    resetScanner();
-                                        //}, 2000);
                                     }
                                 }
                             }
@@ -1659,49 +1629,6 @@
             const modal = document.getElementById('loadingModal');
             if (modal) {
                 modal.remove();
-            }
-        }
-
-        async function handleDataMatrix(scannedText) {
-            try {
-                console.log('Analyzing DataMatrix:', scannedText);
-                if (scannedText.startsWith('01')) {
-                    const match = scannedText.match(/01(\d+?)(?=17|$)/);
-                    if (match && match[1]) {
-                        const gtinPart = match[1];
-                        console.log('Extracted GTIN from GS1:', gtinPart);
-                        const itemCode = productIdMap.get(gtinPart);
-                        
-                        if (itemCode) {
-                            console.log('Found item code:', itemCode);
-                            handleItemCode(itemCode);
-                            return;
-                        } else {
-                            alert(`條碼 ${gtinPart} (${scannedText}) 未在系統中登記`);
-                        }
-                    }
-                } else {
-                    const gtinMatch = scannedText.match(/GTIN[:\s]*(\d+)/i);
-                    if (gtinMatch) {
-                        const gtin = gtinMatch[1];
-                        console.log('Extracted GTIN from text:', gtin);
-                        const itemCode = productIdMap.get(gtin);
-                        
-                        if (itemCode) {
-                            console.log('Found item code:', itemCode);
-                            handleItemCode(itemCode);
-                            return;
-                        } else {
-                            alert(`條碼 ${gtin} (${scannedText}) 未在系統中登記`);
-                        }
-                    } else {
-                        alert(`無法識別的 DataMatrix 格式: ${scannedText}`);
-                        console.log('Unrecognized DataMatrix format:', scannedText);
-                    }
-                }
-            } catch (error) {
-                console.error('DataMatrix 分析錯誤:', error);
-                alert('分析條碼時發生錯誤');
             }
         }
 
@@ -1825,7 +1752,6 @@
             }
         }
 
-        // 新增：顯示 ADD Product ID 按鈕
         function displayAddProductIdButton(scannedProductId) {
             currentScannedProductId = scannedProductId;
             const resultDisplay = document.querySelector('.scan-result-display');
@@ -1841,7 +1767,6 @@
             }
         }
 
-        // 新增：顯示密碼輸入表單
         function showPasswordForm() {
             const modal = document.getElementById('passwordFormModal');
             modal.style.display = 'block';
@@ -1849,15 +1774,13 @@
             document.getElementById('passwordError').textContent = '';
         }
 
-        // 新增：關閉密碼輸入表單
         function closePasswordForm() {
             document.getElementById('passwordFormModal').style.display = 'none';
             setTimeout(() => {
                 resetScanner();
-            }, 500); // 延遲重置掃描器
+            }, 500);
         }
 
-        // 新增：提交密碼
         function submitPassword() {
             const password = document.getElementById('passwordInput').value;
             if (password === 'CTC109') {
@@ -1868,35 +1791,56 @@
             }
         }
 
-        // 新增：顯示添加產品 ID 表單
         function showAdditionForm(productId) {
             const modal = document.getElementById('additionFormModal');
             modal.style.display = 'block';
-            document.getElementById('itemCodeInput').value = '';
-            document.getElementById('itemDescriptionInput').value = '';
-            document.getElementById('productIdInput').value = productId;
+            const itemCodeInput = document.getElementById('itemCodeInput');
+            const itemDescriptionInput = document.getElementById('itemDescriptionInput');
+            const productIdInput = document.getElementById('productIdInput');
 
-            // 初始化自動完成功能
-            $("#itemCodeInput").autocomplete({
-                source: itemCodes,
-                minLength: 2,
-                select: function(event, ui) {
-                    const selectedItemCode = ui.item.value;
-                    const description = itemDescriptions.get(selectedItemCode) || 'No description available';
-                    document.getElementById('itemDescriptionInput').value = description;
-                }
-            });
+            itemCodeInput.value = '';
+            itemDescriptionInput.value = '';
+            productIdInput.value = productId;
+
+            // 確保 jQuery UI 已載入並初始化自動完成
+            if (jQuery.ui) {
+                $(itemCodeInput).autocomplete({
+                    source: function(request, response) {
+                        const term = request.term.toLowerCase();
+                        const filtered = itemCodes.filter(code => code.toLowerCase().includes(term));
+                        response(filtered.slice(0, 10)); // 限制顯示前10個結果
+                    },
+                    minLength: 2,
+                    select: function(event, ui) {
+                        const selectedItemCode = ui.item.value;
+                        const description = itemDescriptions.get(selectedItemCode) || 'No description available';
+                        itemDescriptionInput.value = description;
+                    },
+                    change: function(event, ui) {
+                        // 當輸入完成時自動查找描述
+                        const value = itemCodeInput.value;
+                        if (value && itemCodes.includes(value)) {
+                            const description = itemDescriptions.get(value) || 'No description available';
+                            itemDescriptionInput.value = description;
+                        } else {
+                            itemDescriptionInput.value = '';
+                        }
+                    }
+                });
+                console.log('Autocomplete initialized with', itemCodes.length, 'items');
+            } else {
+                console.error('jQuery UI not loaded');
+                alert('自動完成功能無法載入，請檢查網絡連接');
+            }
         }
 
-        // 新增：關閉添加產品 ID 表單
         function closeAdditionForm() {
             document.getElementById('additionFormModal').style.display = 'none';
             setTimeout(() => {
                 resetScanner();
-            }, 500); // 延遲重置掃描器
+            }, 500);
         }
 
-        // 新增：確認添加產品 ID
         function confirmAddition() {
             const itemCode = document.getElementById('itemCodeInput').value.trim();
             const productId = document.getElementById('productIdInput').value.trim();
@@ -1912,7 +1856,6 @@
             }
         }
 
-        // 新增：更新 Product_ID.xlsx 文件
         async function updateProductIdFile(itemCode, productId) {
             const path = 'Product_ID.xlsx';
             const owner = 'AlexCheung109';
@@ -1920,12 +1863,12 @@
             const token = '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';
 
             try {
-                // 獲取當前文件內容
+                console.log('Fetching current file content...');
                 const fileData = await getFileContent(path);
                 const content = fileData.content;
                 const sha = fileData.sha;
 
-                // 解碼 Base64 並解析 Excel 文件
+                console.log('Decoding file content...');
                 const binaryString = atob(content);
                 const arrayBuffer = new Uint8Array(binaryString.length);
                 for (let i = 0; i < binaryString.length; i++) {
@@ -1935,30 +1878,26 @@
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
 
-                // 將數據轉為陣列
                 const sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
                 if (sheetData.length === 0) {
-                    sheetData.push(['itemCode', 'productId']); // 添加標題行
+                    sheetData.push(['itemCode', 'productId']);
                 }
 
-                // 添加新行
                 sheetData.push([itemCode, productId]);
+                console.log('New data added:', [itemCode, productId]);
 
-                // 更新工作表
                 const newWorksheet = XLSX.utils.aoa_to_sheet(sheetData);
                 workbook.Sheets[sheetName] = newWorksheet;
 
-                // 轉換為 Base64
+                console.log('Encoding new file content...');
                 const newExcelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
                 const newContent = btoa(String.fromCharCode.apply(null, new Uint8Array(newExcelBuffer)));
 
-                // 更新文件
+                console.log('Updating file on GitHub...');
                 await updateFile(path, newContent, sha);
 
                 alert('Product ID added successfully!');
                 closeAdditionForm();
-
-                // 重新載入 Product ID 映射
                 await loadProductIds();
             } catch (error) {
                 console.error('Error updating Product_ID.xlsx:', error);
@@ -1966,38 +1905,42 @@
             }
         }
 
-        // 新增：從 GitHub 獲取文件內容
         async function getFileContent(path) {
             const url = `https://api.github.com/repos/AlexCheung109/WardStockLocationCheck/contents/${path}`;
             const response = await fetch(url, {
+                method: 'GET',
                 headers: {
-                    'Authorization': `token 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`,
-                    'Accept': 'application/vnd.github.v3+json'
+                    'Authorization': `Bearer ${'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'}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
                 }
             });
             if (!response.ok) {
-                throw new Error(`Failed to fetch file: ${response.statusText}`);
+                const errorText = await response.text();
+                throw new Error(`Failed to fetch file: ${response.status} - ${errorText}`);
             }
             return await response.json();
         }
 
-        // 新增：更新 GitHub 文件
         async function updateFile(path, content, sha) {
             const url = `https://api.github.com/repos/AlexCheung109/WardStockLocationCheck/contents/${path}`;
             const response = await fetch(url, {
                 method: 'PUT',
                 headers: {
-                    'Authorization': `token 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`,
-                    'Accept': 'application/vnd.github.v3+json'
+                    'Authorization': `Bearer ${'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'}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     message: `Add new Product ID mapping: ${content.slice(0, 50)}...`,
                     content: content,
-                    sha: sha
+                    sha: sha,
+                    branch: 'main' // 明確指定分支
                 })
             });
             if (!response.ok) {
-                throw new Error(`Failed to update file: ${response.statusText}`);
+                const errorText = await response.text();
+                throw new Error(`Failed to update file: ${response.status} - ${errorText}`);
             }
             return await response.json();
         }
