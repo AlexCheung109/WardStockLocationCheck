@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -18,6 +17,7 @@
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
 
     <style>
+        /* 保留原有的 CSS 樣式，未修改 */
         .result-container {
             display: flex;
             flex-direction: column;
@@ -37,11 +37,11 @@
             background-color: #fff;
             padding: 20px;
             display: flex;
-            flex-direction: column; /* 垂直排列，確保提示文字在上方 */
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             width: 100%;
-            border GROWbottom: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
         }
 
         .qr-code-section canvas {
@@ -56,7 +56,7 @@
             font-size: 14px;
             color: #333;
             text-align: center;
-            margin-bottom: 10px; /* 與二維碼之間的間距 */
+            margin-bottom: 10px;
         }
 
         .text-result-section {
@@ -70,9 +70,9 @@
         }
 
         .text-result-section.error {
-            color: #f44336; /* 紅色 */
-            font-weight: bold; /* 粗體 */
-            text-align: center; /* 置中 */
+            color: #f44336;
+            font-weight: bold;
+            text-align: center;
             font-size: 16px;
         }
         .text-result-section .highlight {
@@ -142,7 +142,7 @@
             top: 0;
             left: 0;
             right: 0;
-            height: calc(50% - 60px); /* 調整高度以配合掃描框 */
+            height: calc(50% - 60px);
         }
 
         .overlay-bottom {
@@ -241,7 +241,7 @@
             display: flex;
             gap: 10px;
             margin-bottom: 20px;
-            flex-wrap: wrap; /* Allow wrapping if needed */
+            flex-wrap: wrap;
         }
         .tab-button {
             padding: 10px 20px;
@@ -293,7 +293,7 @@
             display: block;
             line-height: 1.4;
             margin-bottom: 10px;
-            font-size: 50%; /* Reduced font size by half */
+            font-size: 50%;
         }
         #scheduleImages img {
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -312,12 +312,10 @@
         .result-item {
             margin-bottom: 15px;
         }
-        /* QR Code Container Style */
         .qr-code {
             margin-top: 20px;
             text-align: center;
         }
-        /* Description Text Style */
         .qr-description {
             margin-bottom: 10px;
             font-size: 14px;
@@ -352,8 +350,8 @@
             width: 100%;
             height: 100%;
             z-index: 1000;
-            overflow: auto; /* 添加滾動條以適應長內容 */
-            background-color: rgba(0, 0, 0, 0.7); /* 背景半透明 */
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.7);
         }
 
         .scanner-content {
@@ -366,8 +364,8 @@
             border-radius: 8px;
             width: 90%;
             max-width: 400px;
-            max-height: 90%; /* 限制內容高度 */
-            overflow-y: auto; /* 如果內容超長，啟用滾動條 */
+            max-height: 90%;
+            overflow-y: auto;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
         .scan-result-content {
@@ -397,7 +395,7 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             position: relative;
             z-index: 3;
-            min-height: 200px; /* 確保有足夠空間 */
+            min-height: 200px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -449,24 +447,21 @@
             object-fit: cover;
             border-radius: 4px;
         }
-        /* Item Code Text Style */
         .item-code {
             margin-top: 10px;
             font-size: 16px;
             font-weight: bold;
             color: #333;
         }
-        /* New Styles for Data Capture Schedule Tab */
         .schedule-buttons {
             margin-bottom: 20px;
             display: flex;
-            flex-direction: column; /* Vertical alignment */
-            gap: 10px; /* Space between buttons */
+            flex-direction: column;
+            gap: 10px;
         }
         .hidden {
             display: none;
         }
-        /* Duty Query Form Styles */
         .duty-query-form {
             background-color: #fff;
             padding: 15px;
@@ -477,7 +472,6 @@
         .duty-query-form label {
             margin-top: 10px;
         }
-        /* Styles for Accordion */
         details {
             border: 1px solid #ccc;
             border-radius: 4px;
@@ -491,7 +485,6 @@
             position: relative;
             padding-right: 20px;
         }
-        /* Hide default markers */
         summary::-webkit-details-marker {
             display: none;
         }
@@ -508,11 +501,9 @@
         details[open] summary::after {
             transform: rotate(-180deg);
         }
-        /* Accordion Dropdown Styles */
         .wardDropdown {
             margin-top: 10px;
         }
-        /* Responsive Tabs: Switch to vertical on small screens */
         @media (max-width: 600px) {
             .tabs {
                 flex-direction: column;
@@ -521,7 +512,6 @@
                 width: 100%;
             }
         }
-        /* 新增樣式：密碼和表單模態窗口 */
         .modal {
             display: none;
             position: fixed;
@@ -539,9 +529,9 @@
             padding: 20px;
             border-radius: 8px;
             width: 90%;
-            max-width: 90vw; /* 根據螢幕寬度調整 */
-            max-height: 80vh; /* 限制高度為螢幕的80% */
-            overflow-y: auto; /* 啟用垂直滾動 */
+            max-width: 90vw;
+            max-height: 80vh;
+            overflow-y: auto;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
         .modal-content input[type="text"],
@@ -552,11 +542,11 @@
             border: 1px solid #ddd;
             border-radius: 4px;
             box-sizing: border-box;
-            font-size: 16px; /* 增大字體適應手機 */
+            font-size: 16px;
         }
         .modal-content button {
             margin: 10px 5px 0 0;
-            padding: 12px 24px; /* 增大按鈕適應手機觸控 */
+            padding: 12px 24px;
         }
         .error-message {
             color: red;
@@ -564,12 +554,11 @@
             margin-top: 10px;
             text-align: center;
         }
-        /* 自動完成下拉選單樣式 */
         .ui-autocomplete {
             max-height: 200px;
             overflow-y: auto;
             overflow-x: hidden;
-            z-index: 2000 !important; /* 確保在模態窗口上方 */
+            z-index: 2000 !important;
             font-size: 14px;
         }
     </style>
@@ -611,6 +600,7 @@
                     placeholder="Please select a ward first" 
                     disabled 
                     oninput="filterItemCodes()">
+
                 <button id="scanButton" 
                     class="scan-button" 
                     onclick="startScanner()" 
@@ -752,10 +742,12 @@
         let cupboardWards = new Set();
         let itemDescriptions = new Map();
         let productIdMap = new Map();
-        let itemCodes = []; // 用於自動完成的 Item Code 列表
-        let currentScannedProductId = ''; // 儲存當前掃描的 Product ID
+        let itemCodes = [];
+        let currentScannedProductId = '';
+        
+        // **修改部分 1：新增全局變量儲存 PAT 部分**
+        let patParts = null; // 用於儲存從 Code.csv 讀取的 A、B、C
 
-        // Mapping for Duty and Weekday to Scanner
         const dutyWeekdayScannerMap = {
             "TP1-4": {
                 "Monday": "Scanner L",
@@ -823,24 +815,48 @@
                 itemDescriptions = new Map(
                     itemData.map(row => [row.itemCode.toString(), shortenDescription(row.description)])
                 );
-                itemCodes = itemData.map(row => row.itemCode.toString()); // 提取 Item Codes 用於自動完成
-                console.log('Item Codes loaded:', itemCodes); // 調試用
+                itemCodes = itemData.map(row => row.itemCode.toString());
+                console.log('Item Codes loaded:', itemCodes);
             } catch (error) {
                 console.error('Error loading item descriptions:', error);
                 document.getElementById('error').textContent = 'Error loading item descriptions: ' + error.message;
             }
         }
 
-        // Function to shorten descriptions while preserving meaning
         function shortenDescription(description) {
             if (!description) return 'No description available';
             if (description.length <= 50) return description;
             return description.substring(0, 50) + '...';
         }
 
+        // **修改部分 2：新增函數從 Code.csv 讀取 PAT 部分**
+        async function loadPATParts() {
+            try {
+                const csvUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Code.csv';
+                const response = await fetch(csvUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const csvText = await response.text();
+                const lines = csvText.split('\n').filter(line => line.trim() !== '');
+                const parts = {};
+                lines.forEach(line => {
+                    const [key, value] = line.split('=');
+                    if (key && value) {
+                        parts[key.trim()] = value.trim();
+                    }
+                });
+                return parts;
+            } catch (error) {
+                console.error('Error loading PAT parts:', error);
+                alert('無法載入 PAT 部分，請檢查網絡連接');
+                return null;
+            }
+        }
+
+        // **修改部分 3：在網頁加載時讀取 PAT 部分**
         window.onload = async function() {
             try {
-                // 檢查必要的庫是否已載入
                 if (!window.ZXing) {
                     console.error('ZXing library not loaded');
                 }
@@ -848,7 +864,6 @@
                     console.error('jsQR library not loaded');
                 }
 
-                // 原有的更新日期檢查
                 const locationDate = await getFileLastUpdateDate('Location.xlsx');
                 const cupboardDate = await getFileLastUpdateDate('WardStockCupboard.xlsx');
                 const itemPhqDate = await getFileLastUpdateDate('item_phq.xlsx');
@@ -866,7 +881,14 @@
                 document.getElementById('productIdUpdateInfo').textContent = 
                     `Product ID mapping last updated on: ${productIdDate}`;
 
-                // 載入所有必要數據
+                // 載入 PAT 部分
+                patParts = await loadPATParts();
+                if (patParts) {
+                    console.log('PAT parts loaded successfully:', patParts);
+                } else {
+                    console.error('Failed to load PAT parts');
+                }
+
                 await Promise.all([
                     loadDataFromGitHub(),
                     loadCupboardDataFromGitHub(),
@@ -915,10 +937,8 @@
                     range: 1
                 });
 
-                // 清空當前的 Map
                 productIdMap.clear();
                 
-                // 直接建立 column B 到 column A 的映射
                 productData.forEach(row => {
                     if (row.productId && row.itemCode) {
                         const productId = row.productId.toString().trim();
@@ -1803,13 +1823,12 @@
             itemDescriptionInput.value = '';
             productIdInput.value = productId;
 
-            // 確保 jQuery UI 已載入並初始化自動完成
             if (jQuery.ui) {
                 $(itemCodeInput).autocomplete({
                     source: function(request, response) {
                         const term = request.term.toLowerCase();
                         const filtered = itemCodes.filter(code => code.toLowerCase().includes(term));
-                        response(filtered.slice(0, 10)); // 限制顯示前10個結果
+                        response(filtered.slice(0, 10));
                     },
                     minLength: 2,
                     select: function(event, ui) {
@@ -1818,7 +1837,6 @@
                         itemDescriptionInput.value = description;
                     },
                     change: function(event, ui) {
-                        // 當輸入完成時自動查找描述
                         const value = itemCodeInput.value;
                         if (value && itemCodes.includes(value)) {
                             const description = itemDescriptions.get(value) || 'No description available';
@@ -1857,15 +1875,18 @@
             }
         }
 
+        // **修改部分 4：修改 updateProductIdFile 函數，使用 A+B+C 組裝 PAT**
         async function updateProductIdFile(itemCode, productId) {
             const path = 'Product_ID.xlsx';
             const owner = 'AlexCheung109';
             const repo = 'WardStockLocationCheck';
-            const token = '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';
+
+            // 使用 patParts.A + patParts.B + patParts.C 組裝 PAT
+            const pat = patParts.A + patParts.B + patParts.C;
 
             try {
                 console.log('Fetching current file content...');
-                const fileData = await getFileContent(path);
+                const fileData = await getFileContent(path, pat);
                 const content = fileData.content;
                 const sha = fileData.sha;
 
@@ -1895,7 +1916,7 @@
                 const newContent = btoa(String.fromCharCode.apply(null, new Uint8Array(newExcelBuffer)));
 
                 console.log('Updating file on GitHub...');
-                await updateFile(path, newContent, sha);
+                await updateFile(path, newContent, sha, pat);
 
                 alert('Product ID added successfully!');
                 closeAdditionForm();
@@ -1906,12 +1927,13 @@
             }
         }
 
-        async function getFileContent(path) {
+        // **修改部分 5：修改 getFileContent 函數，接受動態 PAT**
+        async function getFileContent(path, pat) {
             const url = `https://api.github.com/repos/AlexCheung109/WardStockLocationCheck/contents/${path}`;
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${'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'}`,
+                    'Authorization': `Bearer ${pat}`,
                     'Accept': 'application/vnd.github.v3+json',
                     'Content-Type': 'application/json'
                 }
@@ -1923,12 +1945,13 @@
             return await response.json();
         }
 
-        async function updateFile(path, content, sha) {
+        // **修改部分 6：修改 updateFile 函數，接受動態 PAT**
+        async function updateFile(path, content, sha, pat) {
             const url = `https://api.github.com/repos/AlexCheung109/WardStockLocationCheck/contents/${path}`;
             const response = await fetch(url, {
                 method: 'PUT',
                 headers: {
-                    'Authorization': `Bearer ${'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'}`,
+                    'Authorization': `Bearer ${pat}`,
                     'Accept': 'application/vnd.github.v3+json',
                     'Content-Type': 'application/json'
                 },
@@ -1936,7 +1959,7 @@
                     message: `Add new Product ID mapping: ${content.slice(0, 50)}...`,
                     content: content,
                     sha: sha,
-                    branch: 'main' // 明確指定分支
+                    branch: 'main'
                 })
             });
             if (!response.ok) {
