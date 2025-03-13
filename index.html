@@ -1946,28 +1946,30 @@
         }
 
         // **修改部分 6：修改 updateFile 函數，接受動態 PAT**
-        async function updateFile(path, content, sha, pat) {
-            const url = `https://api.github.com/repos/AlexCheung109/WardStockLocationCheck/contents/${path}`;
-            const response = await fetch(url, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${pat}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    message: `Add new Product ID mapping: ${content.slice(0, 50)}...`,
-                    content: content,
-                    sha: sha,
-                    branch: 'main'
-                })
-            });
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Failed to update file: ${response.status} - ${errorText}`);
-            }
-            return await response.json();
-        }
+       async function updateFile(path, content, sha, pat) {
+    console.log('Using PAT for update:', pat);  // 新增這一行來顯示 PAT
+
+    const url = `https://api.github.com/repos/AlexCheung109/WardStockLocationCheck/contents/${path}`;
+    const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+            'Authorization': `Bearer ${pat}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            message: `Add new Product ID mapping: ${content.slice(0, 50)}...`,
+            content: content,
+            sha: sha,
+            branch: 'main'
+        })
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to update file: ${response.status} - ${errorText}`);
+    }
+    return await response.json();
+}
     </script>
 </body>
 </html>
