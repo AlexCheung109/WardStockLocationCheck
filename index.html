@@ -1860,21 +1860,24 @@
             }, 500);
         }
 
-        function confirmAddition() {
-            const itemCode = document.getElementById('itemCodeInput').value.trim();
-            const productId = document.getElementById('productIdInput').value.trim();
+function confirmAddition() {
+    const itemCode = document.getElementById('itemCodeInput').value.trim();
+    const productId = document.getElementById('productIdInput').value.trim();
 
-            if (!itemCode) {
-                alert('Please enter an Item Code');
-                return;
-            }
+    if (!itemCode) {
+        alert('Please enter an Item Code');
+        return;
+    }
 
-            const confirmation = confirm(`是否將 ${productId} 與 ${itemCode} 加入至 Product_ID.xlsx 內？`);
-            if (confirmation) {
-                updateProductIdFile(itemCode, productId);
-            }
-        }
+    // 假設 PAT 是全局變量或已定義，例如 patParts 包含 PAT 的組成部分
+    const pat = patParts.A + patParts.B + patParts.C; // 組裝 PAT
+    console.log('PAT for update:', pat); // 加多一行顯示 PAT
 
+    const confirmation = confirm(`是否將 ${productId} 與 ${itemCode} 加入至 Product_ID.xlsx 內？`);
+    if (confirmation) {
+        updateProductIdFile(itemCode, productId, pat); // 將 PAT 傳遞給 updateProductIdFile
+    }
+}
         // **修改部分 4：修改 updateProductIdFile 函數，使用 A+B+C 組裝 PAT**
         async function updateProductIdFile(itemCode, productId) {
             const path = 'Product_ID.xlsx';
@@ -1946,30 +1949,28 @@
         }
 
         // **修改部分 6：修改 updateFile 函數，接受動態 PAT**
-       async function updateFile(path, content, sha, pat) {
-    console.log('Using PAT for update:', pat);  // 新增這一行來顯示 PAT
-
-    const url = `https://api.github.com/repos/AlexCheung109/WardStockLocationCheck/contents/${path}`;
-    const response = await fetch(url, {
-        method: 'PUT',
-        headers: {
-            'Authorization': `Bearer ${pat}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            message: `Add new Product ID mapping: ${content.slice(0, 50)}...`,
-            content: content,
-            sha: sha,
-            branch: 'main'
-        })
-    });
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to update file: ${response.status} - ${errorText}`);
-    }
-    return await response.json();
-}
+        async function updateFile(path, content, sha, pat) {
+            const url = `https://api.github.com/repos/AlexCheung109/WardStockLocationCheck/contents/${path}`;
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${pat}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: `Add new Product ID mapping: ${content.slice(0, 50)}...`,
+                    content: content,
+                    sha: sha,
+                    branch: 'main'
+                })
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to update file: ${response.status} - ${errorText}`);
+            }
+            return await response.json();
+        }
     </script>
 </body>
 </html>
