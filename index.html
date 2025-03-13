@@ -1879,56 +1879,58 @@ function confirmAddition() {
     }
 }
         // **修改部分 4：修改 updateProductIdFile 函數，使用 A+B+C 組裝 PAT**
-        async function updateProductIdFile(itemCode, productId) {
-            const path = 'Product_ID.xlsx';
-            const owner = 'AlexCheung109';
-            const repo = 'WardStockLocationCheck';
+async function updateProductIdFile(itemCode, productId) {
+    const path = 'Product_ID.xlsx';
+    const owner = 'AlexCheung109';
+    const repo = 'WardStockLocationCheck';
 
-            // 使用 patParts.A + patParts.B + patParts.C 組裝 PAT
-            const pat = patParts.A + patParts.B + patParts.C;
+    // 使用 patParts.A + patParts.B + patParts.C 組裝 PAT
+    const pat = patParts.A + patParts.B + patParts.C;
 
-            try {
-                console.log('Fetching current file content...');
-                const fileData = await getFileContent(path, pat);
-                const content = fileData.content;
-                const sha = fileData.sha;
+    try {
+        console.log('Fetching current file content...');
+        const fileData = await getFileContent(path, pat);
+        const content = fileData.content;
+        const sha = fileData.sha;
 
-                console.log('Decoding file content...');
-                const binaryString = atob(content);
-                const arrayBuffer = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    arrayBuffer[i] = binaryString.charCodeAt(i);
-                }
-                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-
-                const sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                if (sheetData.length === 0) {
-                    sheetData.push(['itemCode', 'productId']);
-                }
-
-                sheetData.push([itemCode, productId]);
-                console.log('New data added:', [itemCode, productId]);
-
-                const newWorksheet = XLSX.utils.aoa_to_sheet(sheetData);
-                workbook.Sheets[sheetName] = newWorksheet;
-
-                console.log('Encoding new file content...');
-                const newExcelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-                const newContent = btoa(String.fromCharCode.apply(null, new Uint8Array(newExcelBuffer)));
-
-                console.log('Updating file on GitHub...');
-                await updateFile(path, newContent, sha, pat);
-
-                alert('Product ID added successfully!');
-                closeAdditionForm();
-                await loadProductIds();
-            } catch (error) {
-                console.error('Error updating Product_ID.xlsx:', error);
-                alert('Failed to update Product_ID.xlsx: ' + error.message);
-            }
+        console.log('Decoding file content...');
+        const binaryString = atob(content);
+        const arrayBuffer = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            arrayBuffer[i] = binaryString.charCodeAt(i);
         }
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+
+        // 獲取工作表的實際資料行數
+        const range = XLSX.utils.decode_range(worksheet['!ref']);
+        const lastRow = range.e.r + 1; // +1 指向下一個可用行
+
+        // 新資料
+        const newData = [[itemCode, productId]];
+
+        // 將新資料追加到最後一行
+        XLSX.utils.sheet_add_aoa(worksheet, newData, { origin: lastRow });
+
+        // 更新工作表的範圍
+        worksheet['!ref'] = XLSX.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: 1, r: lastRow } });
+
+        console.log('Encoding new file content...');
+        const newExcelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const newContent = btoa(String.fromCharCode.apply(null, new Uint8Array(newExcelBuffer)));
+
+        console.log('Updating file on GitHub...');
+        await updateFile(path, newContent, sha, pat);
+
+        alert('Product ID added successfully!');
+        closeAdditionForm();
+        await loadProductIds();
+    } catch (error) {
+        console.error('Error updating Product_ID.xlsx:', error);
+        alert('Failed to update Product_ID.xlsx: ' + error.message);
+    }
+}
 
         // **修改部分 5：修改 getFileContent 函數，接受動態 PAT**
         async function getFileContent(path, pat) {
