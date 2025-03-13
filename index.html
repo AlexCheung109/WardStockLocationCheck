@@ -832,7 +832,7 @@
         // **修改部分 2：新增函數從 Code.csv 讀取 PAT 部分**
         async function loadPATParts() {
             try {
-                const csvUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Code.csv';
+                const csvUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/code.csv';
                 const response = await fetch(csvUrl);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
