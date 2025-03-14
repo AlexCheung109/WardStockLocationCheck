@@ -868,7 +868,7 @@
                 const cupboardDate = await getFileLastUpdateDate('WardStockCupboard.xlsx');
                 const itemPhqDate = await getFileLastUpdateDate('item_phq.xlsx');
                 const dataCaptureDate = await getFileLastUpdateDate('Top_up_schedule_p1.png');
-                const productIdInfo = await getFileInfo('Product_ID.xlsx');
+                const productIdDate = await getFileLastUpdateDate('Product_ID.xlsx');
                 
                 document.getElementById('binShelveUpdateInfo').textContent = 
                     `Bin shelve information last updated on: ${locationDate}`;
@@ -879,7 +879,7 @@
                 document.getElementById('dataCaptureUpdateInfo').textContent = 
                     `Data Capture last updated on: ${dataCaptureDate}`;
                 document.getElementById('productIdUpdateInfo').textContent = 
-                    `Product ID mapping last updated on: ${productIdInfo.updateDate}, Number of data: ${productIdInfo.rowCount}`;
+                    `Product ID mapping last updated on: ${productIdDate}`;
 
                 // 載入 PAT 部分
                 patParts = await loadPATParts();
