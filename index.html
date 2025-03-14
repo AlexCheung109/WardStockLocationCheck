@@ -879,7 +879,7 @@
                 document.getElementById('dataCaptureUpdateInfo').textContent = 
                     `Data Capture last updated on: ${dataCaptureDate}`;
                 document.getElementById('productIdUpdateInfo').textContent = 
-                    `Product ID mapping last updated on: ${productIdDate}`;
+                    `Product ID mapping last updated on: ${productIdInfo.updateDate}, Number of data: ${productIdInfo.rowCount}`;
 
                 // 載入 PAT 部分
                 patParts = await loadPATParts();
