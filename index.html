@@ -868,7 +868,7 @@
                 const cupboardDate = await getFileLastUpdateDate('WardStockCupboard.xlsx');
                 const itemPhqDate = await getFileLastUpdateDate('item_phq.xlsx');
                 const dataCaptureDate = await getFileLastUpdateDate('Top_up_schedule_p1.png');
-                const productIdDate = await getFileLastUpdateDate('Product_ID.xlsx');
+                const productIdInfo = await getFileInfo('Product_ID.xlsx');
                 
                 document.getElementById('binShelveUpdateInfo').textContent = 
                     `Bin shelve information last updated on: ${locationDate}`;
