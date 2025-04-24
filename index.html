@@ -5,14 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ward Stock System</title>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <!-- Include QRious Library for QR Code Generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <!-- Include jsQR Library -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <!-- 在 head 部分添加，在其他 script 標籤後面 -->
     <script src="https://unpkg.com/@zxing/library@latest"></script>
+    <!-- 新增 jQuery 和 jQuery UI 用於自動完成功能 -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
 
     <style>
+        /* 保留原有的 CSS 樣式，未修改 */
         .result-container {
             display: flex;
             flex-direction: column;
@@ -565,11 +570,11 @@
     
     <div class="tabs">
         <button class="tab-button active" onclick="switchTab('binShelve', this)">Ward Stock Item Bin Shelve</button>
-        <button class="tab-button" onclick="switchTab('dataCaptureSchedule', this)">Data Capture Schedule</button>
-        <button class="tab-button" onclick="switchTab('issueTypeEnquiry', this)">Issue Type Enquiry By Item</button>
         <button class="tab-button" onclick="switchTab('cupboard', this)">Ward Stock Cupboard</button>
+        <button class="tab-button" onclick="switchTab('dataCaptureSchedule', this)">Data Capture Schedule</button>
     </div>
 
+    <!-- Bin Shelve Tab -->
     <div id="binShelveTab" class="tab-content active container">
         <h1>Ward Stock Item Bin Shelve Checker</h1>
         <div id="binShelveUpdateInfo" class="update-info"></div>
@@ -586,6 +591,7 @@
             </select>
         </div>
 
+        <!-- Item Code Filter -->
         <div class="search-group">
             <label for="itemCodeFilter">Filter by Item Code:</label>
             <div class="search-input-group">
@@ -597,30 +603,39 @@
 
                 <button id="scanButton" 
                     class="scan-button" 
-                    onclick="startScanner('binShelve')" 
+                    onclick="startScanner()" 
                     disabled>
                     Scan Barcode
                 </button>
             </div>
         </div>
 
+        <!-- Scanner Modal -->
         <div id="scannerModal" class="scanner-modal">
             <div class="scanner-content">
+                <!-- Close Button -->
                 <button class="close-button" onclick="closeScanner()">×</button>
+
+                <!-- Scanner Video -->
                 <div id="scanner-container">
                     <video id="scanner-video" playsinline></video>
+                    <!-- 遮罩層 -->
                     <div class="overlay-mask overlay-top"></div>
                     <div class="overlay-mask overlay-bottom"></div>
                     <div class="overlay-mask overlay-left"></div>
                     <div class="overlay-mask overlay-right"></div>
+                    <!-- 掃描框 -->
                     <div class="scanner-overlay"></div>
                 </div>
+
+                <!-- 掃描結果區域 -->
                 <div class="scan-result-display" style="display: none;">
                     <div class="scan-result-content"></div>
                 </div>
             </div>
         </div>
 
+        <!-- 新增：密碼輸入模態窗口 -->
         <div id="passwordFormModal" class="modal">
             <div class="modal-content">
                 <h2>Enter Password</h2>
@@ -631,6 +646,7 @@
             </div>
         </div>
 
+        <!-- 新增：添加產品 ID 的表單模態窗口 -->
         <div id="additionFormModal" class="modal">
             <div class="modal-content">
                 <h2>Add New Product ID</h2>
@@ -646,9 +662,29 @@
         </div>
 
         <div id="result"></div>
+        <!-- QR Code Container -->
         <div id="qrCodeContainer" class="qr-code"></div>
     </div>
 
+    <!-- Cupboard Tab -->
+    <div id="cupboardTab" class="tab-content container">
+        <h1>Ward Stock Cupboard Location</h1>
+        <div id="cupboardUpdateInfo" class="update-info"></div>
+
+        <div id="cupboardLoading">Loading...</div>
+        <div id="cupboardError" class="error"></div>
+
+        <div class="search-group">
+            <label for="cupboardWardSelect">Ward:</label>
+            <select id="cupboardWardSelect" onchange="searchCupboard()">
+                <option value="">Please select a ward</option>
+            </select>
+        </div>
+
+        <div id="cupboardResult"></div>
+    </div>
+
+    <!-- Data Capture Schedule Tab -->
     <div id="dataCaptureScheduleTab" class="tab-content container">
         <h1>Data Capture Schedule</h1>
         <div id="dataCaptureUpdateInfo" class="update-info"></div>
@@ -656,12 +692,14 @@
             <button onclick="showFullSchedule()">View Full Data Capture Schedule</button>
             <button onclick="showDutyQuery()">Inquire According to Duty</button>
         </div>
+        <!-- Full Schedule Section -->
         <div id="fullSchedule" class="hidden">
             <div id="scheduleImages" style="display: flex; flex-direction: column; gap: 20px;">
                 <img id="schedule1" src="https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Top_up_schedule_p1.png" alt="Top-up Schedule Page 1">
                 <img id="schedule2" src="https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/Top_up_schedule_p2.png" alt="Top-up Schedule Page 2">
             </div>
         </div>
+        <!-- Duty Query Section -->
         <div id="dutyQuery" class="hidden">
             <div class="duty-query-form">
                 <h2>Inquire According to Duty</h2>
@@ -686,6 +724,7 @@
                         <option value="Friday">Friday</option>
                     </select>
                 </div>
+                <!-- Hidden Scanner Group -->
                 <div class="search-group hidden scanner-group">
                     <label for="scannerTextbox">Scanner:</label>
                     <input type="text" id="scannerTextbox" readonly>
@@ -694,34 +733,6 @@
                 <div id="dutyQueryResult"></div>
             </div>
         </div>
-    </div>
-
-    <div id="issueTypeEnquiryTab" class="tab-content container">
-        <h1>Issue Type Enquiry By Item</h1>
-        <div id="wardStockListUpdateInfo" class="update-info"></div>
-        <div id="issueTypeItemPhqUpdateInfo" class="update-info"></div>
-        <div class="search-group">
-            <label for="issueTypeItemCodeInput">Item Code:</label>
-            <div class="search-input-group">
-                <input type="text" id="issueTypeItemCodeInput" placeholder="Enter Item Code">
-                <button id="scanButtonIssueType" class="scan-button" onclick="startScanner('issueTypeEnquiry')">Scan Barcode</button>
-            </div>
-        </div>
-        <div id="issueTypeResult"></div>
-    </div>
-
-    <div id="cupboardTab" class="tab-content container">
-        <h1>Ward Stock Cupboard Location</h1>
-        <div id="cupboardUpdateInfo" class="update-info"></div>
-        <div id="cupboardLoading">Loading...</div>
-        <div id="cupboardError" class="error"></div>
-        <div class="search-group">
-            <label for="cupboardWardSelect">Ward:</label>
-            <select id="cupboardWardSelect" onchange="searchCupboard()">
-                <option value="">Please select a ward</option>
-            </select>
-        </div>
-        <div id="cupboardResult"></div>
     </div>
 
     <script>
@@ -733,10 +744,9 @@
         let productIdMap = new Map();
         let itemCodes = [];
         let currentScannedProductId = '';
-        let patParts = null;
-        let wardStockList = [];
-        let itemUOM = new Map();
-        let currentScanMode = '';
+        
+        // **修改部分 1：新增全局變量儲存 PAT 部分**
+        let patParts = null; // 用於儲存從 Code.csv 讀取的 A、B、C
 
         const dutyWeekdayScannerMap = {
             "TP1-4": {
@@ -769,18 +779,6 @@
             }
         };
 
-        function switchTab(tabId, button) {
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelectorAll('.tab-button').forEach(btn => {
-                btn.classList.remove('active');
-            });
-
-            document.getElementById(tabId + 'Tab').classList.add('active');
-            button.classList.add('active');
-        }
-
         async function getFileLastUpdateDate(filename) {
             try {
                 const response = await fetch(`https://api.github.com/repos/AlexCheung109/WardStockLocationCheck/commits?path=${filename}&page=1&per_page=1`);
@@ -799,27 +797,6 @@
             }
         }
 
-        async function loadWardStockListData() {
-            try {
-                const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/WardStockList.xlsx';
-                const response = await fetch(excelUrl);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const arrayBuffer = await response.arrayBuffer();
-                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-                const sheetName = 'ReportOutput';
-                const worksheet = workbook.Sheets[sheetName];
-                if (!worksheet) {
-                    throw new Error('Sheet "ReportOutput" not found');
-                }
-                wardStockList = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            } catch (error) {
-                console.error('Error loading WardStockList data:', error);
-                document.getElementById('error').textContent = 'Error loading WardStockList data: ' + error.message;
-            }
-        }
-
         async function loadItemDescriptions() {
             try {
                 const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/item_phq.xlsx';
@@ -831,14 +808,14 @@
                 const workbook = XLSX.read(arrayBuffer, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
-                const itemData = XLSX.utils.sheet_to_json(worksheet, { header: 0 });
+                const itemData = XLSX.utils.sheet_to_json(worksheet, {
+                    header: ['itemCode', 'description'],
+                    range: 0
+                });
                 itemDescriptions = new Map(
-                    itemData.map(row => [row[0].toString(), shortenDescription(row[1])])
+                    itemData.map(row => [row.itemCode.toString(), shortenDescription(row.description)])
                 );
-                itemUOM = new Map(
-                    itemData.map(row => [row[0].toString(), row[10]])
-                );
-                itemCodes = itemData.map(row => row[0].toString());
+                itemCodes = itemData.map(row => row.itemCode.toString());
                 console.log('Item Codes loaded:', itemCodes);
             } catch (error) {
                 console.error('Error loading item descriptions:', error);
@@ -852,6 +829,7 @@
             return description.substring(0, 50) + '...';
         }
 
+        // **修改部分 2：新增函數從 Code.csv 讀取 PAT 部分**
         async function loadPATParts() {
             try {
                 const csvUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/code.csv';
@@ -876,6 +854,7 @@
             }
         }
 
+        // **修改部分 3：在網頁加載時讀取 PAT 部分**
         window.onload = async function() {
             try {
                 if (!window.ZXing) {
@@ -890,8 +869,7 @@
                 const itemPhqDate = await getFileLastUpdateDate('item_phq.xlsx');
                 const dataCaptureDate = await getFileLastUpdateDate('Top_up_schedule_p1.png');
                 const productIdDate = await getFileLastUpdateDate('Product_ID.xlsx');
-                const wardStockListDate = await getFileLastUpdateDate('WardStockList.xlsx');
-
+                
                 document.getElementById('binShelveUpdateInfo').textContent = 
                     `Bin shelve information last updated on: ${locationDate}`;
                 document.getElementById('cupboardUpdateInfo').textContent = 
@@ -902,11 +880,8 @@
                     `Data Capture last updated on: ${dataCaptureDate}`;
                 document.getElementById('productIdUpdateInfo').textContent = 
                     `Product ID mapping last updated on: ${productIdDate}`;
-                document.getElementById('wardStockListUpdateInfo').textContent = 
-                    `WardStockList.xlsx last updated on: ${wardStockListDate}`;
-                document.getElementById('issueTypeItemPhqUpdateInfo').textContent = 
-                    `Item_phq.xlsx last updated on: ${itemPhqDate}`;
 
+                // 載入 PAT 部分
                 patParts = await loadPATParts();
                 if (patParts) {
                     console.log('PAT parts loaded successfully:', patParts);
@@ -919,27 +894,8 @@
                     loadCupboardDataFromGitHub(),
                     loadItemDescriptions(),
                     loadProductIds(),
-                    loadWardStockListData(),
                     autoSelectWeekday()
                 ]);
-
-                $("#issueTypeItemCodeInput").autocomplete({
-                    source: function(request, response) {
-                        const term = request.term.toLowerCase();
-                        const filtered = itemCodes.filter(code => code.toLowerCase().startsWith(term));
-                        response(filtered.slice(0, 10));
-                    },
-                    minLength: 1,
-                    select: function(event, ui) {
-                        performIssueTypeSearch(ui.item.value);
-                    }
-                });
-
-                document.getElementById('issueTypeItemCodeInput').addEventListener('keypress', function(event) {
-                    if (event.key === 'Enter') {
-                        performIssueTypeSearch(this.value);
-                    }
-                });
 
                 console.log('Initialization completed');
                 console.log('ZXing available:', !!window.ZXing);
@@ -952,6 +908,18 @@
                     'Error during initialization: ' + error.message;
             }
         };
+
+        function switchTab(tabId, button) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            document.getElementById(tabId + 'Tab').classList.add('active');
+            button.classList.add('active');
+        }
 
         async function loadProductIds() {
             try {
@@ -1472,84 +1440,13 @@
             document.getElementById('weekdaySelect').value = currentWeekday;
         }
 
-        function performIssueTypeSearch(itemCode) {
-            const resultDiv = document.getElementById('issueTypeResult');
-            resultDiv.innerHTML = '';
-            if (!itemCode) {
-                resultDiv.innerHTML = 'Please enter an item code';
-                return;
-            }
-
-            const itemDescription = itemDescriptions.get(itemCode) || 'No description available';
-            const uom = itemUOM.get(itemCode) || 'N/A';
-            const itemRecords = wardStockList.slice(1).filter(row => row[3] === itemCode);
-
-            if (itemRecords.length === 0) {
-                resultDiv.innerHTML = `No records found for item code: ${itemCode}`;
-                return;
-            }
-
-            const groupedByIssueType = itemRecords.reduce((acc, row) => {
-                const issueType = row[2];
-                if (!acc[issueType]) {
-                    acc[issueType] = [];
-                }
-                acc[issueType].push(row);
-                return acc;
-            }, {});
-
-            const sortedIssueTypes = Object.keys(groupedByIssueType).sort();
-
-            let resultHTML = `
-                <p><strong>Item Code | Item Description</strong></p>
-                <p>${itemCode} | ${itemDescription}</p>
-            `;
-
-            sortedIssueTypes.forEach(issueType => {
-                const records = groupedByIssueType[issueType];
-                resultHTML += `<p>${itemCode} 在以下病房是屬於 ${getIssueTypeDescription(issueType)}</p>`;
-                if (issueType === 'W') {
-                    const wards = records.map(record => record[1]).join(', ');
-                    resultHTML += `<p>Ward: ${wards}</p>`;
-                } else {
-                    records.forEach(record => {
-                        const ward = record[1];
-                        const packSize = record[7];
-                        const minQty = record[5];
-                        const refillQty = record[6];
-                        const maxQty = record[4];
-                        resultHTML += `
-                            <p>Ward: ${ward} | Pack Size: ${packSize} | Min QTY: ${minQty} | Refill QTY: ${refillQty} | MAX QTY: ${maxQty} | UOM: ${uom}</p>
-                        `;
-                    });
-                }
-            });
-
-            resultDiv.innerHTML = resultHTML;
-        }
-
-        function getIssueTypeDescription(issueType) {
-            const descriptions = {
-                'D': 'Dangerous Drug',
-                'I': 'Special Fluids',
-                'N': 'Controlled item for IPMOE',
-                'T': 'Trolley Item',
-                'W': 'Ward Stock Item',
-                'C': 'Controlled Ward Stock Item'
-            };
-            return descriptions[issueType] || issueType;
-        }
-
         let scanning = false;
 
-        function startScanner(mode) {
-            currentScanMode = mode;
-            if (mode === 'binShelve') {
-                const selectedWard = document.getElementById('wardSelect').value;
-                if (!selectedWard) {
-                    alert('Please select a ward first');
-                    return;
-                }
+        function startScanner() {
+            const selectedWard = document.getElementById('wardSelect').value;
+            if (!selectedWard) {
+                alert('Please select a ward first');
+                return;
             }
 
             const modal = document.getElementById('scannerModal');
@@ -1582,7 +1479,9 @@
                         width: { ideal: 1920 },
                         height: { ideal: 1080 },
                         frameRate: { ideal: 30 },
-                        advanced: [{ focusMode: "continuous" }]
+                        advanced: [
+                            { focusMode: "continuous" }
+                        ]
                     }
                 })
                 .then(function(stream) {
@@ -1624,13 +1523,7 @@
                                 const fMatch = qrContent.match(/<F>(.*?)<\/F>/);
                                 if (fMatch && fMatch[1]) {
                                     scanning = false;
-                                    if (currentScanMode === 'binShelve') {
-                                        handleItemCode(fMatch[1]);
-                                    } else if (currentScanMode === 'issueTypeEnquiry') {
-                                        performIssueTypeSearch(fMatch[1]);
-                                        displayScanResult(`Item code scanned: ${fMatch[1]}`, true);
-                                        setTimeout(closeScanner, 1500);
-                                    }
+                                    handleItemCode(fMatch[1]);
                                 }
                             }
                         }
@@ -1665,17 +1558,19 @@
                                         }
 
                                         let match = cleanText.match(/^\d{15}$/);
-                                        let productId = match ? match[0] : (cleanText.length >= 15 ? cleanText.substring(0,15) : null);
-                                        if (productId) {
+                                        if (match) {
+                                            let productId = match[0];
                                             const itemCode = productIdMap.get(productId);
                                             if (itemCode) {
-                                                if (currentScanMode === 'binShelve') {
-                                                    handleItemCode(itemCode);
-                                                } else if (currentScanMode === 'issueTypeEnquiry') {
-                                                    performIssueTypeSearch(itemCode);
-                                                    displayScanResult(`Item code scanned: ${itemCode}`, true);
-                                                    setTimeout(closeScanner, 1500);
-                                                }
+                                                handleItemCode(itemCode);
+                                            } else {
+                                                displayAddProductIdButton(productId);
+                                            }
+                                        } else if (cleanText.length >= 15) {
+                                            const productId = cleanText.substring(0,15);
+                                            const itemCode = productIdMap.get(productId);
+                                            if (itemCode) {
+                                                handleItemCode(itemCode);
                                             } else {
                                                 displayAddProductIdButton(productId);
                                             }
@@ -1697,13 +1592,7 @@
                                     const normalizedText = normalizeBarcode(scannedText);
                                     const itemCode = productIdMap.get(normalizedText);
                                     if (itemCode) {
-                                        if (currentScanMode === 'binShelve') {
-                                            handleItemCode(itemCode);
-                                        } else if (currentScanMode === 'issueTypeEnquiry') {
-                                            performIssueTypeSearch(itemCode);
-                                            displayScanResult(`Item code scanned: ${itemCode}`, true);
-                                            setTimeout(closeScanner, 1500);
-                                        }
+                                        handleItemCode(itemCode);
                                     } else {
                                         displayAddProductIdButton(normalizedText);
                                     }
@@ -1971,70 +1860,79 @@
             }, 500);
         }
 
-        function confirmAddition() {
-            const itemCode = document.getElementById('itemCodeInput').value.trim();
-            const productId = document.getElementById('productIdInput').value.trim();
+function confirmAddition() {
+    const itemCode = document.getElementById('itemCodeInput').value.trim();
+    const productId = document.getElementById('productIdInput').value.trim();
 
-            if (!itemCode) {
-                alert('Please enter an Item Code');
-                return;
-            }
+    if (!itemCode) {
+        alert('Please enter an Item Code');
+        return;
+    }
 
-            const pat = patParts.A + patParts.B + patParts.C;
-            console.log('PAT for update:', pat);
+    // 假設 PAT 是全局變量或已定義，例如 patParts 包含 PAT 的組成部分
+    const pat = patParts.A + patParts.B + patParts.C; // 組裝 PAT
+    console.log('PAT for update:', pat); // 加多一行顯示 PAT
 
-            const confirmation = confirm(`是否將 ${productId} 與 ${itemCode} 加入至 Product_ID.xlsx 內？`);
-            if (confirmation) {
-                updateProductIdFile(itemCode, productId, pat);
-            }
+    const confirmation = confirm(`是否將 ${productId} 與 ${itemCode} 加入至 Product_ID.xlsx 內？`);
+    if (confirmation) {
+        updateProductIdFile(itemCode, productId, pat); // 將 PAT 傳遞給 updateProductIdFile
+    }
+}
+        // **修改部分 4：修改 updateProductIdFile 函數，使用 A+B+C 組裝 PAT**
+async function updateProductIdFile(itemCode, productId) {
+    const path = 'Product_ID.xlsx';
+    const owner = 'AlexCheung109';
+    const repo = 'WardStockLocationCheck';
+
+    // 使用 patParts.A + patParts.B + patParts.C 組裝 PAT
+    const pat = patParts.A + patParts.B + patParts.C;
+
+    try {
+        console.log('Fetching current file content...');
+        const fileData = await getFileContent(path, pat);
+        const content = fileData.content;
+        const sha = fileData.sha;
+
+        console.log('Decoding file content...');
+        const binaryString = atob(content);
+        const arrayBuffer = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            arrayBuffer[i] = binaryString.charCodeAt(i);
         }
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
 
-        async function updateProductIdFile(itemCode, productId, pat) {
-            const path = 'Product_ID.xlsx';
-            const owner = 'AlexCheung109';
-            const repo = 'WardStockLocationCheck';
+        // 獲取工作表的實際資料行數
+        const range = XLSX.utils.decode_range(worksheet['!ref']);
+        const lastRow = range.e.r + 1; // +1 指向下一個可用行
 
-            try {
-                console.log('Fetching current file content...');
-                const fileData = await getFileContent(path, pat);
-                const content = fileData.content;
-                const sha = fileData.sha;
+        // 新資料
+        const newData = [[itemCode, productId]];
 
-                console.log('Decoding file content...');
-                const binaryString = atob(content);
-                const arrayBuffer = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    arrayBuffer[i] = binaryString.charCodeAt(i);
-                }
-                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
+        // 將新資料追加到最後一行
+        XLSX.utils.sheet_add_aoa(worksheet, newData, { origin: lastRow });
 
-                const range = XLSX.utils.decode_range(worksheet['!ref']);
-                const lastRow = range.e.r + 1;
+        // 更新工作表的範圍
+        worksheet['!ref'] = XLSX.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: 1, r: lastRow } });
 
-                const newData = [[itemCode, productId]];
+        console.log('Encoding new file content...');
+        const newExcelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const newContent = btoa(String.fromCharCode.apply(null, new Uint8Array(newExcelBuffer)));
 
-                XLSX.utils.sheet_add_aoa(worksheet, newData, { origin: lastRow });
+        console.log('Updating file on GitHub...');
+        await updateFile(path, newContent, sha, pat);
 
-                worksheet['!ref'] = XLSX.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: 1, r: lastRow } });
+        alert('Product ID added successfully!');
+        closeAdditionForm();
+        await loadProductIds();
+    } catch (error) {
+        console.error('Error updating Product_ID.xlsx:', error);
+        alert('Failed to update Product_ID.xlsx: ' + error.message);
+    }
+}
 
-                console.log('Encoding new file content...');
-                const newExcelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-                const newContent = btoa(String.fromCharCode.apply(null, new Uint8Array(newExcelBuffer)));
-
-                console.log('Updating file on GitHub...');
-                await updateFile(path, newContent, sha, pat);
-
-                alert('Product ID added successfully!');
-                closeAdditionForm();
-                await loadProductIds();
-            } catch (error) {
-                console.error('Error updating Product_ID.xlsx:', error);
-                alert('Failed to update Product_ID.xlsx: ' + error.message);
-            }
-        }
-
+        // **修改部分 5：修改 getFileContent 函數，接受動態 PAT**
         async function getFileContent(path, pat) {
             const url = `https://api.github.com/repos/AlexCheung109/WardStockLocationCheck/contents/${path}`;
             const response = await fetch(url, {
@@ -2052,6 +1950,7 @@
             return await response.json();
         }
 
+        // **修改部分 6：修改 updateFile 函數，接受動態 PAT**
         async function updateFile(path, content, sha, pat) {
             const url = `https://api.github.com/repos/AlexCheung109/WardStockLocationCheck/contents/${path}`;
             const response = await fetch(url, {
