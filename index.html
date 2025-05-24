@@ -878,22 +878,27 @@ async function loadItemDescriptions() {
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-        const itemData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        const itemData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }).slice(1); // 跳過標頭行
 
         itemUOM = new Map();
+        itemCodeDescriptions = [];
 
         itemData.forEach(row => {
-            if (row[0] && row[14]) { // column A (index 0) 是 item code, column G (index 6) 是 UOM
+            if (row[0] && row[1]) { // column A (0) 是 item code, column B (1) 是 description
                 const itemCode = row[0].toString().toUpperCase();
-                const uom = row[14].toString();
-                itemUOM.set(itemCode, uom);
+                const description = row[1].toString();
+                itemUOM.set(itemCode, row[14] ? row[14].toString() : 'N/A'); // column O (14) 是 UOM
+                itemCodeDescriptions.push({
+                    label: `${itemCode} | ${description}`,
+                    value: itemCode
+                });
             }
         });
 
-        console.log('Loaded item UOMs:', Array.from(itemUOM.keys()));
+        console.log('Loaded item descriptions for autocomplete:', itemCodeDescriptions.length);
     } catch (error) {
-        console.error('Error loading item UOMs:', error);
-        document.getElementById('error').textContent = 'Error loading item UOMs: ' + error.message;
+        console.error('Error loading item descriptions:', error);
+        document.getElementById('error').textContent = 'Error loading item descriptions: ' + error.message;
     }
 }
 
@@ -969,17 +974,18 @@ async function loadItemDescriptions() {
                     autoSelectWeekday()
                 ]);
 
-                $("#issueTypeItemCodeInput").autocomplete({
-                    source: function(request, response) {
-                        const term = request.term.toLowerCase();
-                        const filtered = itemCodeDescriptions.filter(item => item.toLowerCase().includes(term));
-                        response(filtered.slice(0, 10));
-                    },
+ $("#issueTypeItemCodeInput").autocomplete({
+        source: function(request, response) {
+            const term = request.term.toUpperCase(); // 將輸入轉為大寫
+            const filtered = itemCodeDescriptions.filter(item => 
+                item.label.toUpperCase().startsWith(term) // 只匹配開頭
+            );
+            response(filtered.slice(0, 15)); // 限制顯示 10 個建議
+        },
                     minLength: 1,
                     select: function(event, ui) {
-                        const selectedValue = ui.item.value.split(' | ')[0];
-                        document.getElementById('issueTypeItemCodeInput').value = selectedValue;
-                        performIssueTypeSearch(selectedValue);
+                        document.getElementById('issueTypeItemCodeInput').value = ui.item.value;
+                        performIssueTypeSearch(ui.item.value);
                     }
                 });
 
@@ -1592,6 +1598,7 @@ async function loadItemDescriptions() {
         let scanning = false;
 
         function startScanner(mode) {
+            console.log('Starting scanner for mode:', mode);
             currentScanMode = mode;
             if (mode === 'binShelve') {
                 const selectedWard = document.getElementById('wardSelect').value;
@@ -1600,30 +1607,10 @@ async function loadItemDescriptions() {
                     return;
                 }
             }
-
             const modal = document.getElementById('scannerModal');
-            const video = document.getElementById('scanner-video');
-            let scannerContent = document.querySelector('.scanner-content');
-            let resultDisplay = scannerContent.querySelector('.scan-result-display');
-            if (!resultDisplay) {
-                resultDisplay = document.createElement('div');
-                resultDisplay.className = 'scan-result-display';
-                resultDisplay.style.cssText = `
-                    background-color: white;
-                    padding: 10px;
-                    margin-top: 10px;
-                    border-radius: 4px;
-                    text-align: center;
-                    min-height: 50px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                `;
-                scannerContent.appendChild(resultDisplay);
-            }
-
             modal.style.display = 'block';
-            
+            console.log('Modal set to display: block');
+            const video = document.getElementById('scanner-video');
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                 navigator.mediaDevices.getUserMedia({
                     video: {
@@ -1636,8 +1623,12 @@ async function loadItemDescriptions() {
                 })
                 .then(function(stream) {
                     video.srcObject = stream;
-                    video.setAttribute('playsinline', true);
-                    video.play();
+                    console.log('Stream attached to video');
+                    video.play().then(() => {
+                        console.log('Video started playing');
+                    }).catch(err => {
+                        console.error('Error playing video:', err);
+                    });
                     scanning = true;
                     scanBarcodes();
                 })
@@ -1678,7 +1669,7 @@ async function loadItemDescriptions() {
                                     if (currentScanMode === 'binShelve') {
                                         handleItemCode(fMatch[1]);
                                     } else if (currentScanMode === 'issueTypeEnquiry') {
-                                        performIssueTypeSearch(fMatch[1]);
+                                        document.getElementById('issueTypeItemCodeInput').value = fMatch[1];
                                         displayScanResult(`Item code scanned: ${fMatch[1]}`, true);
                                         setTimeout(closeScanner, 1500);
                                     }
@@ -1708,40 +1699,27 @@ async function loadItemDescriptions() {
                                 scanning = false;
 
                                 if (format === ZXing.BarcodeFormat.DATA_MATRIX) {
-                                    try {
-                                        let cleanText = scannedText.match(/\d+/g)?.join('') || '';
-                                        if (cleanText.length < 15) {
-                                            console.warn(`條碼少於15位數，進行補零: ${cleanText}`);
-                                            cleanText = cleanText.padEnd(15, '0');
-                                        }
+                                    let cleanText = scannedText.match(/\d+/g)?.join('') || '';
+                                    if (cleanText.length < 15) {
+                                        console.warn(`條碼少於15位數，進行補零: ${cleanText}`);
+                                        cleanText = cleanText.padEnd(15, '0');
+                                    }
 
-                                        let match = cleanText.match(/^\d{15}$/);
-                                        let productId = match ? match[0] : (cleanText.length >= 15 ? cleanText.substring(0,15) : null);
-                                        if (productId) {
-                                            const itemCode = productIdMap.get(productId);
-                                            if (itemCode) {
-                                                if (currentScanMode === 'binShelve') {
-                                                    handleItemCode(itemCode);
-                                                } else if (currentScanMode === 'issueTypeEnquiry') {
-                                                    performIssueTypeSearch(itemCode);
-                                                    displayScanResult(`Item code scanned: ${itemCode}`, true);
-                                                    setTimeout(closeScanner, 1500);
-                                                }
-                                            } else {
-                                                displayAddProductIdButton(productId);
+                                    let match = cleanText.match(/^\d{15}$/);
+                                    let productId = match ? match[0] : (cleanText.length >= 15 ? cleanText.substring(0,15) : null);
+                                    if (productId) {
+                                        const itemCode = productIdMap.get(productId);
+                                        if (itemCode) {
+                                            if (currentScanMode === 'binShelve') {
+                                                handleItemCode(itemCode);
+                                            } else if (currentScanMode === 'issueTypeEnquiry') {
+                                                document.getElementById('issueTypeItemCodeInput').value = itemCode;
+                                                displayScanResult(`Item code scanned: ${itemCode}`, true);
+                                                setTimeout(closeScanner, 1500);
                                             }
                                         } else {
-                                            displayScanResult(`條碼格式有誤<br>當前內容：${cleanText}`, false);
-                                            setTimeout(() => {
-                                                resetScanner();
-                                            }, 2000);
+                                            displayAddProductIdButton(productId);
                                         }
-                                    } catch (error) {
-                                        console.error('處理錯誤:', error);
-                                        displayScanResult('處理條碼時發生錯誤', false);
-                                        setTimeout(() => {
-                                            resetScanner();
-                                        }, 2000);
                                     }
                                 } else if (format === ZXing.BarcodeFormat.EAN_13 || 
                                         format === ZXing.BarcodeFormat.CODE_128) {
@@ -1751,7 +1729,7 @@ async function loadItemDescriptions() {
                                         if (currentScanMode === 'binShelve') {
                                             handleItemCode(itemCode);
                                         } else if (currentScanMode === 'issueTypeEnquiry') {
-                                            performIssueTypeSearch(itemCode);
+                                            document.getElementById('issueTypeItemCodeInput').value = itemCode;
                                             displayScanResult(`Item code scanned: ${itemCode}`, true);
                                             setTimeout(closeScanner, 1500);
                                         }
@@ -1829,7 +1807,7 @@ async function loadItemDescriptions() {
                 return;
             }
 
-            console.log('處理商品代碼:', itemCode);
+            console.log('-handling item code:', itemCode);
             const itemInfo = data.find(row => 
                 row.ward === selectedWard && 
                 row.itemCode.toString() === itemCode.toString()
