@@ -9,9 +9,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script src="https://unpkg.com/@zxing/library@latest"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
-    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
-
     <style>
         .result-container {
             display: flex;
@@ -549,37 +546,19 @@
             margin-top: 10px;
             text-align: center;
         }
-        .ui-autocomplete {
+        #issueTypeItemCodeInput {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        #itemCodeSuggestions {
             max-height: 200px;
             overflow-y: auto;
-            overflow-x: hidden;
-            z-index: 2000 !important;
-            font-size: 14px;
         }
-        #issueTypeButtons {
-            margin: 10px 0;
-        }
-        #issueTypeButtons button {
-            position: relative;
-            padding: 5px 20px 5px 10px;
-            margin-right: 5px;
-            font-size: 12px;
-            background-color: #4CAF50;
-            color: white;
-            border-radius: 4px;
-        }
-        #issueTypeButtons button:hover {
-            background-color: #45a049;
-        }
-        #issueTypeButtons button::after {
-            content: '✖';
-            position: absolute;
-            top: 0;
-            right: 5px;
-            font-size: 10px;
-        }
-        .issue-type-section {
-            margin-bottom: 15px;
+        .scan-button {
+            padding: 10px 20px;
+            font-size: 16px;
         }
     </style>
 </head>
@@ -728,8 +707,13 @@
         <div class="search-group">
             <label for="issueTypeItemCodeInput">Item Code:</label>
             <div class="search-input-group">
-                <input type="text" id="issueTypeItemCodeInput" placeholder="Enter Item Code">
-                <button id="scanButtonIssueType" class="scan-button" onclick="startScanner('issueTypeEnquiry')">Scan Barcode</button>
+                <input type="text" id="issueTypeItemCodeInput" list="itemCodeSuggestions" 
+                       placeholder="Enter or scan item code" 
+                       oninput="filterSuggestions(this.value)" 
+                       onchange="performIssueTypeSearch(this.value)">
+                <datalist id="itemCodeSuggestions"></datalist>
+                <button id="scanButtonIssueType" class="scan-button" 
+                        onclick="startScanner('issueTypeEnquiry')">Scan Barcode</button>
             </div>
         </div>
         <div id="issueTypeResult"></div>
@@ -795,22 +779,17 @@
             }
         };
 
-function switchTab(tabId, button) {
-    // 在切換分頁前關閉掃瞄框
-    closeScanner();
-    
-    // 隱藏所有分頁內容並移除 active 樣式
-    document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.remove('active');
-    });
-    document.querySelectorAll('.tab-button').forEach(btn => {
-        btn.classList.remove('active');
-    });
-
-    // 顯示選中的分頁並標記按鈕為 active
-    document.getElementById(tabId + 'Tab').classList.add('active');
-    button.classList.add('active');
-}
+        function switchTab(tabId, button) {
+            closeScanner();
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(tabId + 'Tab').classList.add('active');
+            button.classList.add('active');
+        }
 
         async function getFileLastUpdateDate(filename) {
             try {
@@ -830,78 +809,75 @@ function switchTab(tabId, button) {
             }
         }
 
-async function loadWardStockListData() {
-    try {
-        const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/WardStockList.xlsx';
-        const response = await fetch(excelUrl);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const arrayBuffer = await response.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const sheetName = 'ReportOutput';
-        const worksheet = workbook.Sheets[sheetName];
-        if (!worksheet) {
-            throw new Error('Sheet "ReportOutput" not found');
-        }
-        wardStockList = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        async function loadWardStockListData() {
+            try {
+                const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/WardStockList.xlsx';
+                const response = await fetch(excelUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const sheetName = 'ReportOutput';
+                const worksheet = workbook.Sheets[sheetName];
+                if (!worksheet) {
+                    throw new Error('Sheet "ReportOutput" not found');
+                }
+                wardStockList = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-        itemDescriptions = new Map();
+                itemDescriptions = new Map();
 
-        // 將 wardStockList 中的 item code 和 description 載入，並轉為大寫
-        wardStockList = wardStockList.map(row => {
-            if (row[3] && row[12]) { // column D (index 3) 是 item code, column M (index 12) 是 description
-                const itemCode = row[3].toString().toUpperCase();
-                const description = row[12].toString();
-                itemDescriptions.set(itemCode, description);
-                row[3] = itemCode; // 更新 row 中的 item code 為大寫
-            }
-            return row;
-        });
-
-        console.log('Loaded item descriptions:', Array.from(itemDescriptions.keys()));
-    } catch (error) {
-        console.error('Error loading WardStockList data:', error);
-        document.getElementById('error').textContent = 'Error loading WardStockList data: ' + error.message;
-    }
-}
-
-
-async function loadItemDescriptions() {
-    try {
-        const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/item_phq.xlsx';
-        const response = await fetch(excelUrl);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const arrayBuffer = await response.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const itemData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }).slice(1); // 跳過標頭行
-
-        itemUOM = new Map();
-        itemCodeDescriptions = [];
-
-        itemData.forEach(row => {
-            if (row[0] && row[1]) { // column A (0) 是 item code, column B (1) 是 description
-                const itemCode = row[0].toString().toUpperCase();
-                const description = row[1].toString();
-                itemUOM.set(itemCode, row[14] ? row[14].toString() : 'N/A'); // column O (14) 是 UOM
-                itemCodeDescriptions.push({
-                    label: `${itemCode} | ${description}`,
-                    value: itemCode
+                wardStockList = wardStockList.map(row => {
+                    if (row[3] && row[12]) {
+                        const itemCode = row[3].toString().toUpperCase();
+                        const description = row[12].toString();
+                        itemDescriptions.set(itemCode, description);
+                        row[3] = itemCode;
+                    }
+                    return row;
                 });
+
+                console.log('Loaded item descriptions:', Array.from(itemDescriptions.keys()));
+            } catch (error) {
+                console.error('Error loading WardStockList data:', error);
+                document.getElementById('error').textContent = 'Error loading WardStockList data: ' + error.message;
             }
-        });
+        }
 
-        console.log('Loaded item descriptions for autocomplete:', itemCodeDescriptions.length);
-    } catch (error) {
-        console.error('Error loading item descriptions:', error);
-        document.getElementById('error').textContent = 'Error loading item descriptions: ' + error.message;
-    }
-}
+        async function loadItemDescriptions() {
+            try {
+                const excelUrl = 'https://raw.githubusercontent.com/AlexCheung109/WardStockLocationCheck/main/item_phq.xlsx';
+                const response = await fetch(excelUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const itemData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }).slice(1);
 
+                itemUOM = new Map();
+                itemCodeDescriptions = [];
+
+                itemData.forEach(row => {
+                    if (row[0] && row[1]) {
+                        const itemCode = row[0].toString().toUpperCase();
+                        const description = row[1].toString();
+                        itemUOM.set(itemCode, row[14] ? row[14].toString() : 'N/A');
+                        itemCodeDescriptions.push({
+                            label: `${itemCode} | ${description}`,
+                            value: itemCode
+                        });
+                    }
+                });
+
+                console.log('Loaded item descriptions for autocomplete:', itemCodeDescriptions.length);
+            } catch (error) {
+                console.error('Error loading item descriptions:', error);
+                document.getElementById('error').textContent = 'Error loading item descriptions: ' + error.message;
+            }
+        }
 
         async function loadPATParts() {
             try {
@@ -974,21 +950,6 @@ async function loadItemDescriptions() {
                     autoSelectWeekday()
                 ]);
 
- $("#issueTypeItemCodeInput").autocomplete({
-        source: function(request, response) {
-            const term = request.term.toUpperCase(); // 將輸入轉為大寫
-            const filtered = itemCodeDescriptions.filter(item => 
-                item.label.toUpperCase().startsWith(term) // 只匹配開頭
-            );
-            response(filtered.slice(0, 15)); // 限制顯示 10 個建議
-        },
-                    minLength: 1,
-                    select: function(event, ui) {
-                        document.getElementById('issueTypeItemCodeInput').value = ui.item.value;
-                        performIssueTypeSearch(ui.item.value);
-                    }
-                });
-
                 document.getElementById('issueTypeItemCodeInput').addEventListener('keypress', function(event) {
                     if (event.key === 'Enter') {
                         performIssueTypeSearch(this.value);
@@ -1005,6 +966,21 @@ async function loadItemDescriptions() {
                 document.getElementById('error').textContent = 
                     'Error during initialization: ' + error.message;
             }
+        };
+
+        window.filterSuggestions = function(term) {
+            const datalist = document.getElementById('itemCodeSuggestions');
+            datalist.innerHTML = '';
+            const searchTerm = term.toUpperCase();
+            const filtered = itemCodeDescriptions
+                .filter(item => item.label.toUpperCase().startsWith(searchTerm))
+                .slice(0, 15);
+            filtered.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.value;
+                option.textContent = item.label;
+                datalist.appendChild(option);
+            });
         };
 
         async function loadProductIds() {
@@ -1526,67 +1502,67 @@ async function loadItemDescriptions() {
             document.getElementById('weekdaySelect').value = currentWeekday;
         }
 
-       function performIssueTypeSearch(itemCode) {
-    const resultDiv = document.getElementById('issueTypeResult');
-    resultDiv.innerHTML = '';
-    if (!itemCode) {
-        resultDiv.innerHTML = 'Please enter an item code';
-        return;
-    }
+        function performIssueTypeSearch(itemCode) {
+            const resultDiv = document.getElementById('issueTypeResult');
+            resultDiv.innerHTML = '';
+            if (!itemCode) {
+                resultDiv.innerHTML = 'Please enter an item code';
+                return;
+            }
 
-    const upperItemCode = itemCode.toUpperCase();
-    const itemDescription = itemDescriptions.get(upperItemCode) || 'No description available';
-    const uom = itemUOM.get(upperItemCode) || 'N/A';
-    const itemRecords = wardStockList.slice(1).filter(row => row[3] === upperItemCode);
+            const upperItemCode = itemCode.toUpperCase();
+            const itemDescription = itemDescriptions.get(upperItemCode) || 'No description available';
+            const uom = itemUOM.get(upperItemCode) || 'N/A';
+            const itemRecords = wardStockList.slice(1).filter(row => row[3] === upperItemCode);
 
-    if (itemRecords.length === 0) {
-        resultDiv.innerHTML = `No records found for item code: ${upperItemCode}`;
-        return;
-    }
+            if (itemRecords.length === 0) {
+                resultDiv.innerHTML = `No records found for item code: ${upperItemCode}`;
+                return;
+            }
 
-    const groupedByIssueType = itemRecords.reduce((acc, row) => {
-        const issueType = row[2];
-        if (!acc[issueType]) {
-            acc[issueType] = [];
-        }
-        acc[issueType].push(row);
-        return acc;
-    }, {});
+            const groupedByIssueType = itemRecords.reduce((acc, row) => {
+                const issueType = row[2];
+                if (!acc[issueType]) {
+                    acc[issueType] = [];
+                }
+                acc[issueType].push(row);
+                return acc;
+            }, {});
 
-    const sortedIssueTypes = Object.keys(groupedByIssueType).sort();
-    const issueTypes = sortedIssueTypes.join(' ');
+            const sortedIssueTypes = Object.keys(groupedByIssueType).sort();
+            const issueTypes = sortedIssueTypes.join(' ');
 
-    let resultHTML = `
-        <p><strong>Item Code | Item Description | Issue Types</strong></p>
-        <p>${upperItemCode} | ${itemDescription} | ${issueTypes}</p>
-    `;
-
-    resultHTML += '<div id="issueTypeButtons">';
-    sortedIssueTypes.forEach(issueType => {
-        resultHTML += `<button onclick="toggleIssueType('${issueType}')">${issueType}</button> `;
-    });
-    resultHTML += '</div>';
-
-    sortedIssueTypes.forEach(issueType => {
-        const records = groupedByIssueType[issueType];
-        const numberOfWards = records.length;
-        resultHTML += `<div class="issue-type-section" data-issue-type="${issueType}">`;
-        resultHTML += `<p>[${upperItemCode}] 在以下 [${numberOfWards}] 個病房是屬於 [${issueType}] Item</p>`;
-        records.forEach(record => {
-            const ward = record[1];
-            const packSize = record[7] || 'N/A';
-            const minQty = record[5] || 'N/A';
-            const refillQty = record[6] || 'N/A';
-            const maxQty = record[4] || 'N/A';
-            resultHTML += `
-                <p>Ward: ${ward} | Pack Size: ${packSize} | Min QTY: ${minQty} | Refill QTY: ${refillQty} | MAX QTY: ${maxQty} | UOM: ${uom}</p>
+            let resultHTML = `
+                <p><strong>Item Code | Item Description | Issue Types</strong></p>
+                <p>${upperItemCode} | ${itemDescription} | ${issueTypes}</p>
             `;
-        });
-        resultHTML += `</div>`;
-    });
 
-    resultDiv.innerHTML = resultHTML;
-}
+            resultHTML += '<div id="issueTypeButtons">';
+            sortedIssueTypes.forEach(issueType => {
+                resultHTML += `<button onclick="toggleIssueType('${issueType}')">${issueType}</button> `;
+            });
+            resultHTML += '</div>';
+
+            sortedIssueTypes.forEach(issueType => {
+                const records = groupedByIssueType[issueType];
+                const numberOfWards = records.length;
+                resultHTML += `<div class="issue-type-section" data-issue-type="${issueType}">`;
+                resultHTML += `<p>[${upperItemCode}] 在以下 [${numberOfWards}] 個病房是屬於 [${issueType}] Item</p>`;
+                records.forEach(record => {
+                    const ward = record[1];
+                    const packSize = record[7] || 'N/A';
+                    const minQty = record[5] || 'N/A';
+                    const refillQty = record[6] || 'N/A';
+                    const maxQty = record[4] || 'N/A';
+                    resultHTML += `
+                        <p>Ward: ${ward} | Pack Size: ${packSize} | Min QTY: ${minQty} | Refill QTY: ${refillQty} | MAX QTY: ${maxQty} | UOM: ${uom}</p>
+                    `;
+                });
+                resultHTML += `</div>`;
+            });
+
+            resultDiv.innerHTML = resultHTML;
+        }
 
         function toggleIssueType(issueType) {
             const sections = document.querySelectorAll(`.issue-type-section[data-issue-type="${issueType}"]`);
@@ -1672,6 +1648,7 @@ async function loadItemDescriptions() {
                                         document.getElementById('issueTypeItemCodeInput').value = fMatch[1];
                                         displayScanResult(`Item code scanned: ${fMatch[1]}`, true);
                                         setTimeout(closeScanner, 1500);
+                                        performIssueTypeSearch(fMatch[1]);
                                     }
                                 }
                             }
@@ -1716,6 +1693,7 @@ async function loadItemDescriptions() {
                                                 document.getElementById('issueTypeItemCodeInput').value = itemCode;
                                                 displayScanResult(`Item code scanned: ${itemCode}`, true);
                                                 setTimeout(closeScanner, 1500);
+                                                performIssueTypeSearch(itemCode);
                                             }
                                         } else {
                                             displayAddProductIdButton(productId);
@@ -1732,6 +1710,7 @@ async function loadItemDescriptions() {
                                             document.getElementById('issueTypeItemCodeInput').value = itemCode;
                                             displayScanResult(`Item code scanned: ${itemCode}`, true);
                                             setTimeout(closeScanner, 1500);
+                                            performIssueTypeSearch(itemCode);
                                         }
                                     } else {
                                         displayAddProductIdButton(normalizedText);
